@@ -112,9 +112,6 @@ function renderMenus() {
   });
 }
 
-// ------------------------------------
-// 買い物リスト生成 & 金額集計
-// ------------------------------------
 function generateShoppingList() {
   const checkboxes = document.querySelectorAll('.menu-checkbox:checked');
   const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
@@ -131,11 +128,9 @@ function generateShoppingList() {
     if (menu) {
       menu.ingredients.forEach(ing => {
         const li = document.createElement('li');
-        // data-price属性に価格を持たせる
         li.setAttribute('data-price', ing.price || 0);
         li.innerHTML = `<span>${ing.name}</span><span>${ing.price}円</span>`;
         
-        // タップ時に状態を切り替えて金額を再計算
         li.onclick = function() {
           this.classList.toggle('purchased');
           updateShoppingTotals();
@@ -146,15 +141,15 @@ function generateShoppingList() {
     }
   });
 
-  // 初回の金額計算
   updateShoppingTotals();
 
-  // 画面表示切り替え
   document.getElementById('menuSelectCard').style.display = 'none';
   document.getElementById('shoppingListCard').style.display = 'block';
 }
 
-// 金額のリアルタイム再計算機能
+// ------------------------------------
+// リアルタイム再計算（8%消費税対応）
+// ------------------------------------
 function updateShoppingTotals() {
   const items = document.querySelectorAll('#shoppingList li');
   let totalPrice = 0;
@@ -170,9 +165,20 @@ function updateShoppingTotals() {
 
   const remainingPrice = totalPrice - purchasedPrice;
 
-  document.getElementById('totalPrice').textContent = totalPrice.toLocaleString();
+  // 8%の消費税計算（端数切捨て）
+  const purchasedTax = Math.floor(purchasedPrice * 1.08);
+  const totalTax = Math.floor(totalPrice * 1.08);
+  const remainingTax = Math.floor(remainingPrice * 1.08);
+
+  // 画面に数値を反映
   document.getElementById('purchasedPrice').textContent = purchasedPrice.toLocaleString();
+  document.getElementById('purchasedTax').textContent = purchasedTax.toLocaleString();
+  
+  document.getElementById('totalPrice').textContent = totalPrice.toLocaleString();
+  document.getElementById('totalTax').textContent = totalTax.toLocaleString();
+  
   document.getElementById('remainingPrice').textContent = remainingPrice.toLocaleString();
+  document.getElementById('remainingTax').textContent = remainingTax.toLocaleString();
 }
 
 function backToMenuSelect() {

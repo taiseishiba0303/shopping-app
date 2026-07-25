@@ -19,25 +19,26 @@
 
   <!-- タブ1: 買い物画面 -->
   <div id="tab1" class="tab-content active">
-    <!-- 献立選択カード（リスト作成後に非表示） -->
+    <!-- 献立選択カード -->
     <section class="card" id="menuSelectCard">
       <h2>献立を選ぶ</h2>
       <div id="menuList"></div>
       <button onclick="generateShoppingList()" class="primary-btn">🛒 買い物リストを作成</button>
     </section>
 
-    <!-- 買い物リストカード（初期状態は非表示） -->
+    <!-- 買い物リストカード -->
     <section class="card highlight" id="shoppingListCard" style="display: none;">
       <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 献立を選び直す</button>
       
-      <!-- 金額サマリーエリア -->
+      <!-- 金額サマリーエリア（税込み対応） -->
       <div class="price-summary">
         <div class="price-row-main">
-          🛒 カゴの中（購入済み）: <span id="purchasedPrice">0</span> 円
+          🛒 カゴの中（8%税込）: <span id="purchasedTax">0</span> 円
+          <div class="price-sub-text">税抜: <span id="purchasedPrice">0</span> 円</div>
         </div>
         <div class="price-row-sub">
-          <span>予定合計: <span id="totalPrice">0</span> 円</span>
-          <span>残り: <span id="remainingPrice">0</span> 円</span>
+          <span>予定税込: <span id="totalTax">0</span>円 (<span id="totalPrice">0</span>円)</span>
+          <span>残税込: <span id="remainingTax">0</span>円 (<span id="remainingPrice">0</span>円)</span>
         </div>
       </div>
 
@@ -70,7 +71,7 @@
     </section>
   </div>
 
-  <!-- タブ3: 献立（作成と管理を統合） -->
+  <!-- タブ3: 献立画面 -->
   <div id="tab3" class="tab-content">
     <section class="card">
       <h2>＋ 新しい献立の登録</h2>

@@ -69,7 +69,7 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
 .menu-item { display: block; margin: 8px 0; font-size: 1.1rem; }
 
 /* ------------------------------------
- * 金額表示エリア（買い物中）
+ * 金額表示エリア（8%税込対応）
  * ------------------------------------ */
 .price-summary {
   background: #ffffff;
@@ -79,19 +79,25 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   margin-bottom: 12px;
 }
 .price-row-main {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: bold;
   color: #2e7d32;
   margin-bottom: 4px;
 }
+.price-sub-text {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: normal;
+  margin-top: 2px;
+}
 .price-row-sub {
   display: flex;
   justify-content: space-between;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: #555;
-  margin-top: 4px;
+  margin-top: 6px;
   border-top: 1px dashed #ddd;
-  padding-top: 4px;
+  padding-top: 6px;
 }
 
 .manage-card {
@@ -114,7 +120,7 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
 .master-item button { width: auto; padding: 6px 12px; margin: 0; font-size: 0.8rem; }
 
 /* ------------------------------------
- * 買い物リスト（全画面・片手操作用デザイン）
+ * 買い物リストデザイン
  * ------------------------------------ */
 #shoppingList {
   list-style: none;
@@ -140,7 +146,6 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   transition: all 0.15s ease;
 }
 
-/* カゴに入れたとき（グレーアウト状態） */
 #shoppingList li.purchased {
   background: #eeeeee;
   color: #888888;
