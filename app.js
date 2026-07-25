@@ -1,867 +1,1172 @@
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
-
-let menus = JSON.parse(localStorage.getItem('menus')) || [];
 let masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+let eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
+let menus = JSON.parse(localStorage.getItem('menus')) || [];
+let shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+let stockList = JSON.parse(localStorage.getItem('stockList')) || [];
 
-// 🛒 お買い物リストの操作履歴（アンドゥ用）
-let shoppingHistoryStack = [];
+let fixedScheduleKeys = [
+  { day: '月', time: '昼' }, { day: '月', time: '夜' },
+  { day: '火', time: '昼' }, { day: '火', time: '夜' },
+  { day: '水', time: '昼' }, { day: '水', time: '夜' },
+  { day: '木', time: '昼' }, { day: '木', time: '夜' },
+  { day: '金', time: '昼' }, { day: '金', time: '夜' },
+  { day: '土', time: '昼' }, { day: '土', time: '夜' },
+  { day: '日', time: '昼' }, { day: '日', time: '夜' }
+];
 
-function sortMasterIngredients() {
-  masterIngredients.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-}
+let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+let historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+
+let unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+
+let editingShoppingIndex = null;
+let editingMasterIndex = null;
+let editingEatOutIndex = null;
+let editingMenuIndex = null;
 
 function switchTab(tabId) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
   document.getElementById(tabId).classList.add('active');
+  const btnMap = { tab1: 'tabBtn1', tab2: 'tabBtn2', tab5: 'tabBtn5', tab3: 'tabBtn3' };
+  if (btnMap[tabId]) document.getElementById(btnMap[tabId]).classList.add('active');
+
   if (tabId === 'tab1') {
-    document.getElementById('tabBtn1').classList.add('active');
-    renderMenus();
-    renderSelectableIngredients();
-    updateSelectionSummary();
-  }
-  if (tabId === 'tab2') {
-    document.getElementById('tabBtn2').classList.add('active');
-    renderMasterIngredients();
-  }
-  if (tabId === 'tab3') {
-    document.getElementById('tabBtn3').classList.add('active');
-    renderManageMenus();
-  }
-}
-
-// サブタブ切り替え（献立から選ぶ / 食材一覧から選ぶ）
-function switchSubTab(type) {
-  const menuContent = document.getElementById('subTabMenuContent');
-  const ingContent = document.getElementById('subTabIngContent');
-  const menuBtn = document.getElementById('subTabMenuBtn');
-  const ingBtn = document.getElementById('subTabIngBtn');
-
-  if (type === 'menu') {
-    menuContent.style.display = 'block';
-    ingContent.style.display = 'none';
-    menuBtn.classList.add('active');
-    menuBtn.style.color = '#4CAF50';
-    menuBtn.style.borderBottom = '3px solid #4CAF50';
-    ingBtn.classList.remove('active');
-    ingBtn.style.color = '#666';
-    ingBtn.style.borderBottom = 'none';
-  } else {
-    menuContent.style.display = 'none';
-    ingContent.style.display = 'block';
-    menuBtn.classList.remove('active');
-    menuBtn.style.color = '#666';
-    menuBtn.style.borderBottom = 'none';
-    ingBtn.classList.add('active');
-    ingBtn.style.color = '#4CAF50';
-    ingBtn.style.borderBottom = '3px solid #4CAF50';
+    renderSchedule();
+    renderHistory();
+  } else if (tabId === 'tab2') {
+    renderShoppingListView();
+    renderMenuSelect();
+    renderSelectIngredients();
+  } else if (tabId === 'tab3') {
+    // データベースタブを開いたときはデフォルトで食材サブタブを表示・描画
+    switchDbSubTab('ing');
+  } else if (tabId === 'tab5') {
+    renderStock();
   }
 }
 
-function getIngredientSelectOptions() {
-  let options = '<option value="">(選択)</option>';
-  masterIngredients.forEach((item, index) => {
-    options += `<option value="${index}">${item.name} (${item.price}円)</option>`;
-  });
-  return options;
-}
+// データベースタブ内のサブタブ切り替え用関数
+function switchDbSubTab(sub) {
+  const isIng = sub === 'ing';
+  const isMenu = sub === 'menu';
+  const isEat = sub === 'eat';
 
-function addIngredientRow() {
-  const container = document.getElementById('ingredientInputs');
-  const div = document.createElement('div');
-  div.className = 'ing-row';
-  div.innerHTML = `
-    <select onchange="selectMasterIngredient(this)">${getIngredientSelectOptions()}</select>
-    <input type="text" class="ing-name" placeholder="材料">
-    <input type="number" class="ing-price" placeholder="円">
-  `;
-  container.appendChild(div);
-}
+  document.getElementById('dbSubTabIngContent').style.display = isIng ? 'block' : 'none';
+  document.getElementById('dbSubTabMenuContent').style.display = isMenu ? 'block' : 'none';
+  document.getElementById('dbSubTabEatContent').style.display = isEat ? 'block' : 'none';
 
-function selectMasterIngredient(selectEl) {
-  const index = selectEl.value;
-  const row = selectEl.parentElement;
-  if (index !== "") {
-    const item = masterIngredients[index];
-    row.querySelector('.ing-name').value = item.name;
-    row.querySelector('.ing-price').value = item.price;
-  }
-}
+  const ingBtn = document.getElementById('dbSubTabIngBtn');
+  const menuBtn = document.getElementById('dbSubTabMenuBtn');
+  const eatBtn = document.getElementById('dbSubTabEatBtn');
 
-function saveMenu() {
-  const name = document.getElementById('menuName').value;
-  if (!name) return alert('献立名を入力してください');
-
-  const names = document.querySelectorAll('#tab3 .ing-name');
-  const prices = document.querySelectorAll('#tab3 .ing-price');
-  const ingredients = [];
-
-  names.forEach((input, index) => {
-    const ingName = input.value.trim();
-    const ingPrice = parseInt(prices[index].value) || 0;
-    
-    if (ingName) {
-      ingredients.push({ name: ingName, price: ingPrice });
-
-      const existsIndex = masterIngredients.findIndex(item => item.name === ingName);
-      if (existsIndex === -1) {
-        masterIngredients.push({ name: ingName, price: ingPrice });
-      } else {
-        masterIngredients[existsIndex].price = ingPrice;
-      }
-    }
+  [ingBtn, menuBtn, eatBtn].forEach(btn => {
+    btn.style.background = '#f5f5f5';
+    btn.style.color = '#666';
   });
 
-  sortMasterIngredients();
-  localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+  const activeBtn = isIng ? ingBtn : (isMenu ? menuBtn : eatBtn);
+  activeBtn.style.background = '#4CAF50';
+  activeBtn.style.color = 'white';
 
-  menus.push({ id: Date.now(), name, ingredients });
-  localStorage.setItem('menus', JSON.stringify(menus));
-
-  document.getElementById('menuName').value = '';
-  document.getElementById('ingredientInputs').innerHTML = '';
-  addIngredientRow();
-  
-  renderMenus();
-  renderManageMenus();
-  renderSelectableIngredients();
-  alert('献立と食材を保存しました！');
+  if (isIng) renderMasterIngredients();
+  if (isMenu) renderManageMenus();
+  if (isEat) renderEatOutStores();
 }
 
-// 献立一覧の描画
-function renderMenus() {
-  const list = document.getElementById('menuList');
-  if (!list) return;
-  list.innerHTML = '';
+function switchSubTab(sub) {
+  const isMenu = sub === 'menu';
+  document.getElementById('subTabMenuContent').style.display = isMenu ? 'block' : 'none';
+  document.getElementById('subTabIngContent').style.display = isMenu ? 'none' : 'block';
+  document.getElementById('subTabMenuBtn').style.borderBottom = isMenu ? '3px solid #4CAF50' : 'none';
+  document.getElementById('subTabMenuBtn').style.color = isMenu ? '#4CAF50' : '#666';
+  document.getElementById('subTabIngBtn').style.borderBottom = !isMenu ? '3px solid #4CAF50' : 'none';
+  document.getElementById('subTabIngBtn').style.color = !isMenu ? '#4CAF50' : '#666';
+}
+
+function renderMenuSelect() {
+  const container = document.getElementById('menuList');
+  if (!container) return;
   if (menus.length === 0) {
-    list.innerHTML = '<p style="color:#666; text-align:center; padding: 20px;">登録された献立がありません。<br>「📝 献立」タブから追加してください。</p>';
+    container.innerHTML = '<p style="color:#888; text-align:center;">登録されている献立がありません。</p>';
     return;
   }
-
-  const btnStyleMinus = "width:28px; height:28px; border-radius:50%; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
-  const btnStylePlus = "width:28px; height:28px; border-radius:50%; border:1px solid #4CAF50; background:#e8f5e9; color:#2e7d32; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
-
-  menus.forEach(menu => {
-    const menuTotal = menu.ingredients.reduce((sum, ing) => sum + (ing.price || 0), 0);
-
-    const div = document.createElement('div');
-    div.className = 'menu-item-row';
-    div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer; user-select: none;';
-
-    div.innerHTML = `
-      <div style="display: flex; align-items: center; flex: 1; overflow: hidden;" onclick="toggleRowSelect(this, 'menu')">
-        <input type="checkbox" value="${menu.id}" class="menu-checkbox" style="margin-right: 10px; transform: scale(1.2); pointer-events: none;">
-        <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${menu.name}</span>
-        <span style="font-size: 0.85em; color: #777; margin-left: 6px;">（${menuTotal}円）</span>
+  container.innerHTML = menus.map((menu, mIdx) => `
+    <div class="select-item">
+      <label style="cursor:pointer; display:flex; align-items:center; flex:1; margin:0;">
+        <input type="checkbox" class="menu-checkbox" value="${mIdx}" onchange="toggleQtyControls(this, 'menu-qty-${mIdx}')" style="width:auto; margin-right:8px;">
+        <span style="font-weight:500;">${menu.name}</span>
+        <span style="font-size:0.8rem; color:#666; margin-left:6px;">(${menu.ingredients.length}品)</span>
+      </label>
+      <div id="menu-qty-${mIdx}" class="qty-controls" style="display:none;">
+        <button type="button" class="qty-btn" onclick="changeQty('menu-qty-num-${mIdx}', -1)">-</button>
+        <span id="menu-qty-num-${mIdx}" class="qty-num">1</span>
+        <button type="button" class="qty-btn" onclick="changeQty('menu-qty-num-${mIdx}', 1)">+</button>
       </div>
-      <div class="qty-control" style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
-        <button type="button" onclick="changeQty(this, -1, 'menu')" style="${btnStyleMinus}">-</button>
-        <span class="qty-count" style="min-width: 18px; text-align: center; font-weight: bold; font-size: 0.95rem;">0</span>
-        <button type="button" onclick="changeQty(this, 1, 'menu')" style="${btnStylePlus}">+</button>
-      </div>
-    `;
-
-    list.appendChild(div);
-  });
+    </div>
+  `).join('');
 }
 
-// 食材一覧の描画
-function renderSelectableIngredients() {
+function renderSelectIngredients() {
   const container = document.getElementById('selectIngList');
   if (!container) return;
-  container.innerHTML = '';
-
   if (masterIngredients.length === 0) {
-    container.innerHTML = '<p style="color:#666; text-align:center; padding: 20px;">登録された食材がありません。<br>「🥦 食材登録」タブから追加してください。</p>';
+    container.innerHTML = '<p style="color:#888; text-align:center;">登録されている食材がありません。</p>';
+    return;
+  }
+  container.innerHTML = masterIngredients.map((ing, iIdx) => `
+    <div class="select-item">
+      <label style="cursor:pointer; display:flex; align-items:center; flex:1; margin:0;">
+        <input type="checkbox" class="ing-checkbox" value="${iIdx}" onchange="toggleQtyControls(this, 'ing-qty-${iIdx}')" style="width:auto; margin-right:8px;">
+        <span style="font-weight:500;">${ing.name}</span>
+        <span style="font-size:0.85rem; color:#2e7d32; font-weight:bold; margin-left:6px;">${ing.price ? ing.price + '円' : ''}</span>
+      </label>
+      <div id="ing-qty-${iIdx}" class="qty-controls" style="display:none;">
+        <button type="button" class="qty-btn" onclick="changeQty('ing-qty-num-${iIdx}', -1)">-</button>
+        <span id="ing-qty-num-${iIdx}" class="qty-num">1</span>
+        <button type="button" class="qty-btn" onclick="changeQty('ing-qty-num-${iIdx}', 1)">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleQtyControls(checkbox, controlId) {
+  const controlBox = document.getElementById(controlId);
+  if (controlBox) controlBox.style.display = checkbox.checked ? 'flex' : 'none';
+  updateSummary();
+}
+
+function changeQty(numId, amount) {
+  const numSpan = document.getElementById(numId);
+  if (!numSpan) return;
+  let current = parseInt(numSpan.textContent) || 1;
+  current += amount;
+  if (current < 1) current = 1;
+  numSpan.textContent = current;
+  updateSummary();
+}
+
+function updateSummary() {
+  const summaryBox = document.getElementById('selectedItemsSummary');
+  if (!summaryBox) return;
+  const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
+  const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
+
+  if (checkedMenus.length === 0 && checkedIngs.length === 0) {
+    summaryBox.innerHTML = '<p class="summary-empty" style="margin:0; color:#666; font-size:0.9rem;">選択中の項目はありません</p>';
     return;
   }
 
-  const btnStyleMinus = "width:28px; height:28px; border-radius:50%; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
-  const btnStylePlus = "width:28px; height:28px; border-radius:50%; border:1px solid #4CAF50; background:#e8f5e9; color:#2e7d32; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
-
-  masterIngredients.forEach((item, index) => {
-    const div = document.createElement('div');
-    div.className = 'ing-item-row';
-    div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer; user-select: none;';
-
-    div.innerHTML = `
-      <div style="display: flex; align-items: center; flex: 1; overflow: hidden;" onclick="toggleRowSelect(this, 'ing')">
-        <input type="checkbox" value="${index}" class="ing-checkbox" style="margin-right: 10px; transform: scale(1.2); pointer-events: none;">
-        <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</span>
-        <span style="font-size: 0.85em; color: #777; margin-left: 6px;">（${item.price}円）</span>
-      </div>
-      <div class="qty-control" style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
-        <button type="button" onclick="changeQty(this, -1, 'ing')" style="${btnStyleMinus}">-</button>
-        <span class="qty-count" style="min-width: 18px; text-align: center; font-weight: bold; font-size: 0.95rem;">0</span>
-        <button type="button" onclick="changeQty(this, 1, 'ing')" style="${btnStylePlus}">+</button>
-      </div>
-    `;
-
-    container.appendChild(div);
+  let html = '<strong style="font-size:0.9rem; color:#2e7d32;">選択中:</strong><ul style="margin:4px 0 0 20px; padding:0; font-size:0.9rem;">';
+  checkedMenus.forEach(el => {
+    const m = menus[el.value];
+    const qtyEl = document.getElementById(`menu-qty-num-${el.value}`);
+    const qty = qtyEl ? qtyEl.textContent : 1;
+    html += `<li>献立: ${m.name} × ${qty}</li>`;
   });
+  checkedIngs.forEach(el => {
+    const i = masterIngredients[el.value];
+    const qtyEl = document.getElementById(`ing-qty-num-${el.value}`);
+    const qty = qtyEl ? qtyEl.textContent : 1;
+    html += `<li>食材: ${i.name} (${i.price || 0}円) × ${qty}</li>`;
+  });
+  html += '</ul>';
+  summaryBox.innerHTML = html;
 }
 
-function toggleRowSelect(textDiv, type) {
-  const row = textDiv.parentElement;
-  const checkbox = row.querySelector('input[type="checkbox"]');
-  const countSpan = row.querySelector('.qty-count');
-  let currentQty = parseInt(countSpan.textContent) || 0;
+/**
+ * 予定から読み込むボタンを押したとき実行される関数（完了メッセージのalertを削除済み）
+ */
+function generateShoppingListFromSchedule() {
+  const scheduleRows = document.querySelectorAll('#currentScheduleTableBody tr');
+  let rawItems = [];
 
-  if (currentQty === 0) {
-    currentQty = 1;
-    checkbox.checked = true;
+  if (scheduleRows.length > 0) {
+    scheduleRows.forEach(row => {
+      const input = row.querySelector('input[type="text"], .menu-input');
+      if (input && input.value.trim() !== "") {
+        const menuName = input.value.trim();
+        const matchedMenu = menus.find(m => m.name === menuName);
+        if (matchedMenu && matchedMenu.ingredients) {
+          matchedMenu.ingredients.forEach(i => {
+            rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
+          });
+        }
+      }
+    });
   } else {
-    currentQty = 0;
-    checkbox.checked = false;
+    fixedScheduleKeys.forEach(keyObj => {
+      const keyStr = `${keyObj.day}_${keyObj.time}`;
+      const data = currentSchedules[keyStr];
+      if (data && data.name && data.name.trim() !== "") {
+        const matchedMenu = menus.find(m => m.name === data.name.trim());
+        if (matchedMenu && matchedMenu.ingredients) {
+          matchedMenu.ingredients.forEach(i => {
+            rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
+          });
+        }
+      }
+    });
   }
 
-  countSpan.textContent = currentQty;
-  updateSelectionSummary();
-}
+  if (rawItems.length === 0) {
+    alert('予定に登録されている献立（材料付き）がありません。');
+    return;
+  }
 
-function changeQty(btn, delta, type) {
-  event.stopPropagation();
-  const row = btn.closest('div.menu-item-row, div.ing-item-row');
-  const checkbox = row.querySelector('input[type="checkbox"]');
-  const countSpan = row.querySelector('.qty-count');
-
-  let currentQty = parseInt(countSpan.textContent) || 0;
-  currentQty += delta;
-
-  if (currentQty < 0) currentQty = 0;
-
-  countSpan.textContent = currentQty;
-  checkbox.checked = currentQty > 0;
-
-  updateSelectionSummary();
-}
-
-function getSelectedItemsData() {
-  const selectedMenus = [];
-  const selectedIngs = [];
-
-  document.querySelectorAll('.menu-item-row').forEach(row => {
-    const cb = row.querySelector('.menu-checkbox');
-    const qty = parseInt(row.querySelector('.qty-count').textContent) || 0;
-    if (cb.checked && qty > 0) {
-      selectedMenus.push({ id: parseInt(cb.value), qty: qty });
+  let map = {};
+  unitPrices = {};
+  rawItems.forEach(item => {
+    if (!map[item.name]) {
+      map[item.name] = { name: item.name, totalPrice: 0, qty: 0, completed: false };
+      unitPrices[item.name] = item.price > 0 ? item.price : 0;
+    } else {
+      if (item.price > 0 && unitPrices[item.name] === 0) { unitPrices[item.name] = item.price; }
     }
+    map[item.name].qty += 1;
   });
 
-  document.querySelectorAll('.ing-item-row').forEach(row => {
-    const cb = row.querySelector('.ing-checkbox');
-    const qty = parseInt(row.querySelector('.qty-count').textContent) || 0;
-    if (cb.checked && qty > 0) {
-      selectedIngs.push({ index: parseInt(cb.value), qty: qty });
-    }
+  Object.keys(map).forEach(name => {
+    map[name].totalPrice = unitPrices[name] * map[name].qty;
   });
 
-  return { selectedMenus, selectedIngs };
+  shoppingList = Object.values(map);
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+  
+  renderShoppingListView();
+  // ご要望に基づき、完了時の alert メッセージを削除しました。
 }
 
-function getConsolidatedIngredients() {
-  const { selectedMenus, selectedIngs } = getSelectedItemsData();
-  const ingMap = {};
-
-  selectedMenus.forEach(item => {
-    const menu = menus.find(m => m.id === item.id);
-    if (menu) {
-      menu.ingredients.forEach(ing => {
-        const name = ing.name;
-        const price = ing.price || 0;
-        if (!ingMap[name]) {
-          ingMap[name] = { price: 0, count: 0 };
-        }
-        ingMap[name].price += price * item.qty;
-        ingMap[name].count += item.qty;
+function addSelectedItemsToShoppingList() {
+  const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
+  const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
+  let rawItems = [];
+  
+  checkedMenus.forEach(el => {
+    const m = menus[el.value];
+    const qtyEl = document.getElementById(`menu-qty-num-${el.value}`);
+    const qty = qtyEl ? (parseInt(qtyEl.textContent) || 1) : 1;
+    for (let q = 0; q < qty; q++) {
+      m.ingredients.forEach(i => {
+        rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
       });
     }
   });
 
-  selectedIngs.forEach(item => {
-    const ing = masterIngredients[item.index];
-    if (ing) {
-      const name = ing.name;
-      const price = ing.price || 0;
-      if (!ingMap[name]) {
-        ingMap[name] = { price: 0, count: 0 };
-      }
-      ingMap[name].price += price * item.qty;
-      ingMap[name].count += item.qty;
+  checkedIngs.forEach(el => {
+    const i = masterIngredients[el.value];
+    const qtyEl = document.getElementById(`ing-qty-num-${el.value}`);
+    const qty = qtyEl ? (parseInt(qtyEl.textContent) || 1) : 1;
+    for (let q = 0; q < qty; q++) {
+      rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
     }
   });
 
-  const consolidatedList = Object.keys(ingMap).map(name => ({
-    name: name,
-    price: ingMap[name].price,
-    count: ingMap[name].count
-  }));
+  if (rawItems.length === 0) { alert('アイテムが選択されていません。'); return; }
 
-  consolidatedList.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-
-  return consolidatedList;
-}
-
-function updateSelectionSummary() {
-  const container = document.getElementById('selectedItemsSummary');
-  if (!container) return;
-
-  const items = getConsolidatedIngredients();
-
-  if (items.length === 0) {
-    container.innerHTML = '<p class="summary-empty" style="color:#777; margin:0; font-size:0.9rem;">選択中の項目はありません</p>';
-    return;
-  }
-
-  let totalPrice = 0;
-  items.forEach(item => {
-    totalPrice += item.price;
-  });
-
-  const taxPrice = Math.floor(totalPrice * 1.08);
-
-  let html = `<div style="font-weight: bold; color: #2e7d32; margin-bottom: 6px; font-size: 0.95rem;">🛒 選択中: ${items.length}種類 (税込 ${taxPrice.toLocaleString()}円 / 税抜 ${totalPrice.toLocaleString()}円)</div><ul style="margin: 0; padding-left: 15px; font-size: 0.9rem; color: #444;">`;
-  items.forEach(item => {
-    const countText = item.count > 1 ? ` (×${item.count})` : '';
-    html += `<li style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>• ${item.name}${countText}</span><span>${item.price}円</span></li>`;
-  });
-  html += '</ul>';
-
-  container.innerHTML = html;
-}
-
-// ── 買い物リストを生成（または既存の購入状態を維持して追加分をマージ） ──
-function generateShoppingList() {
-  const consolidatedList = getConsolidatedIngredients();
-  const { selectedMenus } = getSelectedItemsData();
-
-  if (consolidatedList.length === 0) {
-    return alert('献立または食材を1つ以上選択してください');
-  }
-
-  let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
-  
-  selectedMenus.forEach(item => {
-    const menu = menus.find(m => m.id === item.id);
-    if (menu) {
-      for (let i = 0; i < item.qty; i++) {
-        currentSchedules.push({
-          id: Date.now() + Math.random(),
-          name: menu.name,
-          day: '未定',
-          time: '昼',
-          ingredients: menu.ingredients ? menu.ingredients.map(ing => ing.name) : [],
-          completed: false
-        });
+  rawItems.forEach(item => {
+    let existing = shoppingList.find(s => s.name === item.name);
+    if (existing) {
+      existing.qty += 1;
+      if (item.price > 0 && (!unitPrices[item.name] || unitPrices[item.name] === 0)) {
+        unitPrices[item.name] = item.price;
       }
-    }
-  });
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-
-  const shoppingList = document.getElementById('shoppingList');
-  
-  // 既にリストが存在する場合（追加で戻ってきた場合）は、既存の「購入済み状態」を退避する
-  const existingPurchasedMap = {};
-  shoppingList.querySelectorAll('li').forEach(li => {
-    const nameText = li.querySelector('.item-name-text').textContent;
-    const isPurchased = li.classList.contains('purchased');
-    existingPurchasedMap[nameText] = isPurchased;
-  });
-
-  shoppingList.innerHTML = '';
-
-  consolidatedList.forEach(item => {
-    const displayName = item.count > 1 ? `${item.name} (×${item.count})` : item.name;
-    const wasPurchased = existingPurchasedMap[displayName] || false;
-    addShoppingListItem(item.name, item.price, item.count, wasPurchased);
-  });
-
-  shoppingHistoryStack = [];
-  updateUndoButtonState();
-  updateShoppingTotals();
-
-  document.getElementById('menuSelectCard').style.display = 'none';
-  document.getElementById('shoppingListCard').style.display = 'block';
-}
-
-// ── 履歴を保存する関数 ──
-function saveShoppingStateToHistory() {
-  const shoppingList = document.getElementById('shoppingList');
-  if (!shoppingList) return;
-  const htmlState = shoppingList.innerHTML;
-  shoppingHistoryStack.push(htmlState);
-  if (shoppingHistoryStack.length > 15) {
-    shoppingHistoryStack.shift();
-  }
-  updateUndoButtonState();
-}
-
-// ── 「元に戻す」ボタンの有効・無効切り替え ──
-function updateUndoButtonState() {
-  const undoBtn = document.getElementById('undoShoppingBtn');
-  if (undoBtn) {
-    if (shoppingHistoryStack.length > 0) {
-      undoBtn.style.opacity = '1';
-      undoBtn.style.cursor = 'pointer';
-      undoBtn.disabled = false;
+      existing.totalPrice = (unitPrices[item.name] || 0) * existing.qty;
     } else {
-      undoBtn.style.opacity = '0.4';
-      undoBtn.style.cursor = 'default';
-      undoBtn.disabled = true;
+      unitPrices[item.name] = item.price > 0 ? item.price : 0;
+      shoppingList.push({ name: item.name, qty: 1, totalPrice: unitPrices[item.name], completed: false });
     }
-  }
-}
-
-// ── 操作を1つ元に戻す（Undo） ──
-function undoShoppingAction() {
-  if (shoppingHistoryStack.length === 0) return;
-  const previousStateHtml = shoppingHistoryStack.pop();
-  const shoppingList = document.getElementById('shoppingList');
-  if (shoppingList) {
-    shoppingList.innerHTML = previousStateHtml;
-    rebindShoppingListEvents();
-    updateShoppingTotals();
-  }
-  updateUndoButtonState();
-}
-
-// 復元された要素のイベントを再紐付け
-function rebindShoppingListEvents() {
-  const items = document.querySelectorAll('#shoppingList li');
-  items.forEach(li => {
-    const clickableArea = li.querySelector('.item-main-clickable');
-    const deleteBtn = li.querySelector('.delete-item-btn');
-    if (!clickableArea || !deleteBtn) return;
-
-    clickableArea.addEventListener('click', () => {
-      saveShoppingStateToHistory();
-      li.classList.toggle('purchased');
-      if (li.classList.contains('purchased')) {
-        li.style.background = '#f1f3f4';
-        li.style.color = '#888';
-        li.style.borderColor = '#ddd';
-        clickableArea.style.textDecoration = 'line-through';
-      } else {
-        li.style.background = '#fff';
-        li.style.color = '#333';
-        li.style.borderColor = '#e0e0e0';
-        clickableArea.style.textDecoration = 'none';
-      }
-      updateShoppingTotals();
-    });
-
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      saveShoppingStateToHistory();
-      li.remove();
-      updateShoppingTotals();
-    });
   });
+
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+  
+  backToShoppingMain();
 }
 
-function addShoppingListItem(name, price, count, isPurchased = false) {
-  const shoppingList = document.getElementById('shoppingList');
-  const li = document.createElement('li');
-  li.setAttribute('data-price', price || 0);
+function openMenuSelect() {
+  const menuSelectCard = document.getElementById('menuSelectCard');
+  const shoppingListCard = document.getElementById('shoppingListCard');
+  if (shoppingListCard) shoppingListCard.style.display = 'none';
+  if (menuSelectCard) {
+    menuSelectCard.style.display = 'block';
+    menuSelectCard.scrollTop = 0;
+  }
+  renderMenuSelect();
+  renderSelectIngredients();
+}
+
+function backToShoppingMain() {
+  const menuSelectCard = document.getElementById('menuSelectCard');
+  const shoppingListCard = document.getElementById('shoppingListCard');
+  if (menuSelectCard) menuSelectCard.style.display = 'none';
+  if (shoppingListCard) shoppingListCard.style.display = 'block';
+  renderShoppingListView();
+}
+
+function renderShoppingListView() {
+  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+  const container = document.getElementById('shoppingList');
+  if (!container) return;
   
-  // 購入済み状態（isPurchased）に応じて初期スタイルを切り替える
-  if (isPurchased) {
-    li.classList.add('purchased');
-    li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background: #f1f3f4; color: #888; border: 1px solid #ddd; border-radius: 6px; font-weight: 500; user-select: none;';
+  if (shoppingList.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center; padding:15px 0;">お買い物リストは空です。「予定から読み込む」または「献立・食材を追加」ボタンから追加してください。</p>';
   } else {
-    li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background: #fff; color: #333; border: 1px solid #e0e0e0; border-radius: 6px; font-weight: 500; user-select: none;';
+    container.innerHTML = shoppingList.map((item, idx) => `
+      <li class="list-item shopping-item ${item.completed ? 'completed' : ''}" data-index="${idx}">
+        <div style="font-weight:500;">
+          ${item.name} 
+          <span style="font-size:0.85rem; color:#666; margin-left:6px;">(×${item.qty})</span>
+        </div>
+        <span style="color:#2e7d32; font-weight:bold;">${item.totalPrice.toLocaleString()}円</span>
+      </li>
+    `).join('');
   }
 
-  const displayName = count > 1 ? `${name} (×${count})` : name;
+  document.querySelectorAll('.shopping-item').forEach(item => {
+    let timer = null;
+    let isLongPress = false;
+    const idx = parseInt(item.getAttribute('data-index'));
 
-  li.innerHTML = `
-    <div class="item-main-clickable" style="display: flex; justify-content: space-between; align-items: center; flex: 1; cursor: pointer; margin-right: 10px; ${isPurchased ? 'text-decoration: line-through;' : ''}">
-      <span class="item-name-text">${displayName}</span>
-      <span class="item-price-text" style="margin-left: 10px;">${price}円</span>
-    </div>
-    <button type="button" class="delete-item-btn" style="background: #ff7043; color: white; border: none; border-radius: 4px; padding: 6px 10px; font-size: 0.8rem; font-weight: bold; cursor: pointer; flex-shrink: 0;">消す</button>
-  `;
+    const startLongPress = () => {
+      isLongPress = false;
+      timer = setTimeout(() => { isLongPress = true; openShoppingModal(idx); }, 600);
+    };
+    const cancelLongPress = () => { if (timer) { clearTimeout(timer); timer = null; } };
 
-  const clickableArea = li.querySelector('.item-main-clickable');
-  const deleteBtn = li.querySelector('.delete-item-btn');
-
-  // タップで「購入済み（取り消し線）」の切り替え
-  clickableArea.addEventListener('click', () => {
-    saveShoppingStateToHistory();
-    li.classList.toggle('purchased');
-    if (li.classList.contains('purchased')) {
-      li.style.background = '#f1f3f4';
-      li.style.color = '#888';
-      li.style.borderColor = '#ddd';
-      clickableArea.style.textDecoration = 'line-through';
-    } else {
-      li.style.background = '#fff';
-      li.style.color = '#333';
-      li.style.borderColor = '#e0e0e0';
-      clickableArea.style.textDecoration = 'none';
-    }
-    updateShoppingTotals();
+    item.addEventListener('mousedown', startLongPress);
+    item.addEventListener('mouseup', () => { cancelLongPress(); if (!isLongPress) toggleShoppingItem(idx); });
+    item.addEventListener('mouseleave', cancelLongPress);
+    item.addEventListener('touchstart', startLongPress, { passive: true });
+    item.addEventListener('touchend', () => { cancelLongPress(); if (!isLongPress) toggleShoppingItem(idx); });
+    item.addEventListener('touchcancel', cancelLongPress);
   });
 
-  // 「消す」ボタンを押したらリストから完全に削除
-  deleteBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    saveShoppingStateToHistory();
-    li.remove();
-    updateShoppingTotals();
+  let total = 0, purchased = 0;
+  shoppingList.forEach(i => {
+    const p = i.totalPrice || 0;
+    total += p;
+    if (i.completed) purchased += p;
   });
+  const remaining = total - purchased;
 
-  shoppingList.appendChild(li);
+  const setElText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setElText('totalPrice', total.toLocaleString());
+  setElText('totalTax', Math.floor(total * 1.1).toLocaleString());
+  setElText('purchasedPrice', purchased.toLocaleString());
+  setElText('purchasedTax', Math.floor(purchased * 1.1).toLocaleString());
+  setElText('remainingPrice', remaining.toLocaleString());
+  setElText('remainingTax', Math.floor(remaining * 1.1).toLocaleString());
 }
 
-function updateShoppingTotals() {
-  const items = document.querySelectorAll('#shoppingList li');
-  let totalPrice = 0;
-  let purchasedPrice = 0;
+function toggleShoppingItem(idx) {
+  shoppingList[idx].completed = !shoppingList[idx].completed;
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  renderShoppingListView();
+}
 
-  items.forEach(item => {
-    const price = parseInt(item.getAttribute('data-price')) || 0;
-    totalPrice += price;
-    if (item.classList.contains('purchased')) {
-      purchasedPrice += price;
-    }
-  });
+function openShoppingModal(idx) {
+  editingShoppingIndex = idx;
+  const item = shoppingList[idx];
+  const nameEl = document.getElementById('modalItemName');
+  const qtyEl = document.getElementById('modalItemQty');
+  const modalEl = document.getElementById('shoppingEditModal');
+  if (nameEl) nameEl.textContent = item.name;
+  if (qtyEl) qtyEl.textContent = item.qty;
+  if (modalEl) modalEl.style.display = 'flex';
+  if (navigator.vibrate) navigator.vibrate(50);
+}
 
-  const remainingPrice = totalPrice - purchasedPrice;
+function closeShoppingModal() {
+  const modalEl = document.getElementById('shoppingEditModal');
+  if (modalEl) modalEl.style.display = 'none';
+  editingShoppingIndex = null;
+}
 
-  const purchasedTax = Math.floor(purchasedPrice * 1.08);
-  const totalTax = Math.floor(totalPrice * 1.08);
-  const remainingTax = Math.floor(remainingPrice * 1.08);
+function modalChangeQty(amount) {
+  if (editingShoppingIndex === null) return;
+  let item = shoppingList[editingShoppingIndex];
+  item.qty += amount;
+  if (item.qty < 1) item.qty = 1;
 
-  const purchasedPriceEl = document.getElementById('purchasedPrice');
-  const purchasedTaxEl = document.getElementById('purchasedTax');
-  if (purchasedPriceEl) purchasedPriceEl.textContent = purchasedPrice.toLocaleString();
-  if (purchasedTaxEl) purchasedTaxEl.textContent = purchasedTax.toLocaleString();
+  let unit = unitPrices[item.name] || 0;
+  item.totalPrice = Math.round(unit * item.qty);
+
+  const qtyEl = document.getElementById('modalItemQty');
+  if (qtyEl) qtyEl.textContent = item.qty;
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  renderShoppingListView();
+}
+
+function modalDeleteShoppingItem() {
+  if (editingShoppingIndex === null) return;
+  shoppingList.splice(editingShoppingIndex, 1);
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  closeShoppingModal();
+  renderShoppingListView();
+}
+
+function sendToStock() {
+  if (shoppingList.length === 0) { alert('買い物リストに項目がありません。'); return; }
   
-  const totalPriceEl = document.getElementById('totalPrice');
-  const totalTaxEl = document.getElementById('totalTax');
-  if (totalPriceEl) totalPriceEl.textContent = totalPrice.toLocaleString();
-  if (totalTaxEl) totalTaxEl.textContent = totalTax.toLocaleString();
-  
-  const remainingPriceEl = document.getElementById('remainingPrice');
-  const remainingTaxEl = document.getElementById('remainingTax');
-  if (remainingPriceEl) remainingPriceEl.textContent = remainingPrice.toLocaleString();
-  if (remainingTaxEl) remainingTaxEl.textContent = remainingTax.toLocaleString();
+  shoppingList.forEach(item => {
+    let existing = stockList.find(s => s.name === item.name);
+    if (existing) { existing.qty += item.qty; } 
+    else { stockList.push({ name: item.name, qty: item.qty }); }
+  });
+  localStorage.setItem('stockList', JSON.stringify(stockList));
+
+  shoppingList = [];
+  unitPrices = {};
+  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+
+  alert('買い物リストのアイテムを在庫に追加し、お買い物リストをリセットしました！');
+  switchTab('tab5');
 }
 
-function backToMenuSelect() {
-  document.getElementById('menuSelectCard').style.display = 'block';
-  document.getElementById('shoppingListCard').style.display = 'none';
-}
-
-// 登録済み献立の管理エリア描画
-function renderManageMenus() {
-  const container = document.getElementById('manageMenuList');
+function renderStock() {
+  const container = document.getElementById('stockListContainer');
   if (!container) return;
-  
-  if (menus.length === 0) {
-    container.innerHTML = '<p style="color:#666;">登録された献立はありません。</p>';
+  if (stockList.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center; padding:20px 0;">現在、在庫はありません。</p>';
     return;
   }
-
-  container.innerHTML = '';
-  menus.forEach((menu, menuIndex) => {
-    const div = document.createElement('div');
-    div.className = 'manage-card';
-
-    let ingHtml = '';
-    menu.ingredients.forEach((ing, ingIndex) => {
-      ingHtml += `
-        <div class="edit-row">
-          <input type="text" value="${ing.name}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'name', this.value)" style="flex: 1; margin-bottom: 0;">
-          <input type="number" value="${ing.price}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'price', this.value)" style="width: 70px; margin-bottom: 0;"> 円
-          <button type="button" onclick="deleteIngredientFromMenu(${menuIndex}, ${ingIndex})" class="danger-btn" style="padding: 6px 10px; margin: 0;">×</button>
-        </div>
-      `;
-    });
-
-    div.innerHTML = `
-      <label style="font-size: 0.8rem; color: #666;">献立名:</label>
-      <input type="text" value="${menu.name}" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 8px;" onchange="updateMenuName(${menuIndex}, this.value)">
-      <label style="font-size: 0.8rem; color: #666;">材料・価格:</label>
-      ${ingHtml}
-      <button type="button" onclick="addIngredientToMenu(${menuIndex})" class="secondary-btn" style="margin: 6px 0 12px 0;">＋ 材料を追加</button>
-      <button type="button" class="danger-btn" onclick="deleteMenu(${menuIndex})" style="width: 100%;">この献立を削除</button>
-    `;
-    container.appendChild(div);
+  let sortedStock = stockList.map((item, originalIndex) => ({ ...item, originalIndex })).sort((a, b) => {
+    if (a.qty > 0 && b.qty === 0) return -1;
+    if (a.qty === 0 && b.qty > 0) return 1;
+    return 0;
   });
+
+  container.innerHTML = sortedStock.map((item) => {
+    const isEmpty = item.qty === 0;
+    return `
+      <div class="list-item stock-item ${isEmpty ? 'empty' : ''}">
+        <span style="font-weight:500;">${item.name}</span>
+        <div class="qty-controls">
+          <button type="button" class="qty-btn" onclick="updateStockQty(${item.originalIndex}, -1)">-</button>
+          <span class="qty-num">${item.qty}</span>
+          <button type="button" class="qty-btn" onclick="updateStockQty(${item.originalIndex}, 1)">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
-function addIngredientToMenu(menuIndex) {
-  menus[menuIndex].ingredients.push({ name: '', price: 0 });
-  localStorage.setItem('menus', JSON.stringify(menus));
-  renderManageMenus();
-  renderMenus();
-}
-
-function deleteIngredientFromMenu(menuIndex, ingIndex) {
-  menus[menuIndex].ingredients.splice(ingIndex, 1);
-  localStorage.setItem('menus', JSON.stringify(menus));
-  renderManageMenus();
-  renderMenus();
-}
-
-function updateMenuName(menuIndex, newName) {
-  if (!newName) return alert('献立名を入力してください');
-  menus[menuIndex].name = newName;
-  localStorage.setItem('menus', JSON.stringify(menus));
-  renderMenus();
-}
-
-function updateIngredient(menuIndex, ingIndex, field, value) {
-  if (field === 'price') value = parseInt(value) || 0;
-  menus[menuIndex].ingredients[ingIndex][field] = value;
-  
-  if (field === 'name' && value.trim() !== '') {
-    const ingName = value.trim();
-    const ingPrice = menus[menuIndex].ingredients[ingIndex].price || 0;
-    const existsIndex = masterIngredients.findIndex(item => item.name === ingName);
-    if (existsIndex === -1) {
-      masterIngredients.push({ name: ingName, price: ingPrice });
-      sortMasterIngredients();
-      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-      renderMasterIngredients();
-      renderSelectableIngredients();
-    }
-  }
-
-  localStorage.setItem('menus', JSON.stringify(menus));
-  renderMenus();
-}
-
-function deleteMenu(index) {
-  if (confirm('本当にこの献立を削除しますか？')) {
-    menus.splice(index, 1);
-    localStorage.setItem('menus', JSON.stringify(menus));
-    renderManageMenus();
-    renderMenus();
-  }
+function updateStockQty(idx, amount) {
+  stockList[idx].qty += amount;
+  if (stockList[idx].qty < 0) stockList[idx].qty = 0;
+  localStorage.setItem('stockList', JSON.stringify(stockList));
+  renderStock();
 }
 
 function saveMasterIngredient() {
-  const name = document.getElementById('masterIngName').value.trim();
-  const price = parseInt(document.getElementById('masterIngPrice').value) || 0;
-
-  if (!name) return alert('食材名を入力してください');
-
-  const existsIndex = masterIngredients.findIndex(item => item.name === name);
-  if (existsIndex === -1) {
-    masterIngredients.push({ name, price });
-  } else {
-    masterIngredients[existsIndex].price = price;
-  }
-
-  sortMasterIngredients();
+  const nameEl = document.getElementById('masterIngName');
+  const priceEl = document.getElementById('masterIngPrice');
+  if (!nameEl) return;
+  const name = nameEl.value.trim();
+  const price = priceEl ? priceEl.value.trim() : '';
+  if (!name) { alert('食材名を入力してください'); return; }
+  masterIngredients.push({ name, price: price ? Number(price) : null });
   localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-
-  document.getElementById('masterIngName').value = '';
-  document.getElementById('masterIngPrice').value = '';
-
+  nameEl.value = '';
+  if (priceEl) priceEl.value = '';
   renderMasterIngredients();
-  renderSelectableIngredients();
-  alert('食材を登録しました！');
 }
 
 function saveBulkIngredients() {
-  const text = document.getElementById('bulkIngInput').value.trim();
-  if (!text) return alert('テキストを入力または貼り付けてください');
-
-  const lines = text.split('\n');
-  let addedCount = 0;
-
-  lines.forEach(line => {
-    const parts = line.trim().split(/[\s,:\t]+/);
-    if (parts.length >= 2) {
+  const textEl = document.getElementById('bulkIngInput');
+  if (!textEl) return;
+  const text = textEl.value.trim();
+  if (!text) { alert('テキストを入力してください'); return; }
+  text.split('\n').forEach(line => {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length > 0 && parts[0]) {
       const name = parts[0];
-      const price = parseInt(parts[1].replace(/[^0-9]/g, '')) || 0;
-      if (name && !isNaN(price)) {
-        const existsIndex = masterIngredients.findIndex(item => item.name === name);
-        if (existsIndex === -1) {
-          masterIngredients.push({ name, price });
-        } else {
-          masterIngredients[existsIndex].price = price;
-        }
-        addedCount++;
-      }
+      const price = parts[1] && !isNaN(parts[1]) ? Number(parts[1]) : null;
+      masterIngredients.push({ name, price });
     }
   });
-
-  sortMasterIngredients();
   localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-  document.getElementById('bulkIngInput').value = '';
+  textEl.value = '';
   renderMasterIngredients();
-  renderSelectableIngredients();
-  alert(`${addedCount}件の食材を登録・更新しました！`);
+  alert('一括登録しました！');
 }
 
 function renderMasterIngredients() {
   const container = document.getElementById('masterIngList');
   if (!container) return;
-
   if (masterIngredients.length === 0) {
-    container.innerHTML = '<p style="color:#666;">登録された食材はありません。</p>';
+    container.innerHTML = '<p style="color:#888; text-align:center;">登録食材はありません。</p>';
     return;
   }
+  container.innerHTML = masterIngredients.map((ing, idx) => `
+    <div class="list-item master-ing-item" data-index="${idx}">
+      <span style="font-weight:500;">${ing.name}</span>
+      <span style="color:#2e7d32; font-weight:bold;">${ing.price ? ing.price + '円' : '価格未設定'}</span>
+    </div>
+  `).join('');
 
-  container.innerHTML = '';
-  masterIngredients.forEach((item, index) => {
-    const div = document.createElement('div');
-    div.className = 'master-item';
-    div.innerHTML = `
-      <div class="edit-row" style="flex: 1; margin-bottom: 0;">
-        <input type="text" value="${item.name}" onchange="updateMasterIngredient(${index}, 'name', this.value)" style="width: 50%; margin-bottom: 0;">
-        <input type="number" value="${item.price}" onchange="updateMasterIngredient(${index}, 'price', this.value)" style="width: 35%; margin-bottom: 0;"> 円
-      </div>
-      <button type="button" class="danger-btn" onclick="deleteMasterIngredient(${index})" style="width: auto; padding: 6px 10px; margin: 0 0 0 8px; font-size: 0.8rem;">削除</button>
-    `;
-    container.appendChild(div);
+  document.querySelectorAll('.master-ing-item').forEach(item => {
+    let timer = null;
+    const idx = parseInt(item.getAttribute('data-index'));
+    const startLongPress = () => { timer = setTimeout(() => { openMasterIngModal(idx); }, 600); };
+    const cancelLongPress = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    item.addEventListener('mousedown', startLongPress);
+    item.addEventListener('mouseup', cancelLongPress);
+    item.addEventListener('mouseleave', cancelLongPress);
+    item.addEventListener('touchstart', startLongPress, { passive: true });
+    item.addEventListener('touchend', cancelLongPress);
+    item.addEventListener('touchcancel', cancelLongPress);
   });
 }
 
-function updateMasterIngredient(index, field, value) {
-  if (field === 'price') value = parseInt(value) || 0;
-  masterIngredients[index][field] = value;
-  
-  sortMasterIngredients();
+function openMasterIngModal(idx) {
+  editingMasterIndex = idx;
+  const ing = masterIngredients[idx];
+  const nameEl = document.getElementById('editMasterName');
+  const priceEl = document.getElementById('editMasterPrice');
+  const modalEl = document.getElementById('masterIngEditModal');
+  if (nameEl) nameEl.value = ing.name;
+  if (priceEl) priceEl.value = ing.price !== null ? ing.price : '';
+  if (modalEl) modalEl.style.display = 'flex';
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+function closeMasterIngModal() {
+  const modalEl = document.getElementById('masterIngEditModal');
+  if (modalEl) modalEl.style.display = 'none';
+  editingMasterIndex = null;
+}
+function updateMasterIngredient() {
+  if (editingMasterIndex === null) return;
+  const nameEl = document.getElementById('editMasterName');
+  const priceEl = document.getElementById('editMasterPrice');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const price = priceEl ? priceEl.value.trim() : '';
+  if (!name) { alert('食材名を入力してください'); return; }
+  masterIngredients[editingMasterIndex] = { name, price: price ? Number(price) : null };
   localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+  closeMasterIngModal();
   renderMasterIngredients();
-  renderSelectableIngredients();
-  updateSelectionSummary();
 }
-
-function deleteMasterIngredient(index) {
-  if (confirm('この食材を削除しますか？')) {
-    masterIngredients.splice(index, 1);
+function deleteMasterIngredientFromModal() {
+  if (editingMasterIndex === null) return;
+  if (confirm(`「${masterIngredients[editingMasterIndex].name}」を削除しますか？`)) {
+    masterIngredients.splice(editingMasterIndex, 1);
     localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+    closeMasterIngModal();
     renderMasterIngredients();
-    renderSelectableIngredients();
-    updateSelectionSummary();
   }
 }
 
-sortMasterIngredients();
-addIngredientRow();
-renderMenus();
-renderSelectableIngredients();
-updateSelectionSummary();
-
-function exportMenuTxt() {
-  const { selectedMenus, selectedIngs } = getSelectedItemsData();
-
-  if (selectedMenus.length === 0 && selectedIngs.length === 0) {
-    return alert('出力する献立または食材がありません');
-  }
-
-  let textContent = "=== 買い物・献立リスト ===\n\n";
-
-  if (selectedMenus.length > 0) {
-    textContent += "【献立】\n";
-    selectedMenus.forEach(item => {
-      const menu = menus.find(m => m.id === item.id);
-      if (menu) {
-        const countText = item.qty > 1 ? ` (×${item.qty})` : '';
-        textContent += `■ ${menu.name}${countText}\n`;
-        menu.ingredients.forEach(ing => {
-          textContent += `  ・${ing.name} (${ing.price || 0}円)\n`;
-        });
-        textContent += "\n";
-      }
-    });
-  }
-
-  if (selectedIngs.length > 0) {
-    textContent += "【単品追加の食材】\n";
-    selectedIngs.forEach(item => {
-      const ing = masterIngredients[item.index];
-      if (ing) {
-        const countText = item.qty > 1 ? ` (×${item.qty})` : '';
-        textContent += `  ・${ing.name}${countText} (${ing.price || 0}円)\n`;
-      }
-    });
-    textContent += "\n";
-  }
-
-  const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  
-  const today = new Date().toISOString().split('T')[0];
-  a.download = `menu_list_${today}.txt`;
-  
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  // stock.htmlを新しく開く
-  window.open('stock.html', '_blank');
+function saveEatOutStore() {
+  const nameEl = document.getElementById('eatOutStoreName');
+  const priceEl = document.getElementById('eatOutStorePrice');
+  if (!nameEl) return;
+  const name = nameEl.value.trim();
+  const price = priceEl ? priceEl.value.trim() : '';
+  if (!name) { alert('店舗名を入力してください'); return; }
+  eatOutStores.push({ name, price: price ? Number(price) : null });
+  localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+  nameEl.value = '';
+  if (priceEl) priceEl.value = '';
+  renderEatOutStores();
 }
 
-// --- バックアップ・データ共有（エクスポート・インポート）機能 ---
+function renderEatOutStores() {
+  const container = document.getElementById('eatOutStoreList');
+  if (!container) return;
+  if (eatOutStores.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center;">登録されている外食店舗はありません。</p>';
+    return;
+  }
+  container.innerHTML = eatOutStores.map((store, idx) => `
+    <div class="list-item eatout-store-item" data-index="${idx}">
+      <span style="font-weight:500;">${store.name}</span>
+      <span style="color:#2e7d32; font-weight:bold;">${store.price ? store.price + '円' : '価格未設定'}</span>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.eatout-store-item').forEach(item => {
+    let timer = null;
+    const idx = parseInt(item.getAttribute('data-index'));
+    const startLongPress = () => { timer = setTimeout(() => { openEatOutStoreModal(idx); }, 600); };
+    const cancelLongPress = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    item.addEventListener('mousedown', startLongPress);
+    item.addEventListener('mouseup', cancelLongPress);
+    item.addEventListener('mouseleave', cancelLongPress);
+    item.addEventListener('touchstart', startLongPress, { passive: true });
+    item.addEventListener('touchend', cancelLongPress);
+    item.addEventListener('touchcancel', cancelLongPress);
+  });
+}
+
+function openEatOutStoreModal(idx) {
+  editingEatOutIndex = idx;
+  const store = eatOutStores[idx];
+  const nameEl = document.getElementById('editEatOutStoreName');
+  const priceEl = document.getElementById('editEatOutStorePrice');
+  const modalEl = document.getElementById('eatOutStoreEditModal');
+  if (nameEl) nameEl.value = store.name;
+  if (priceEl) priceEl.value = store.price !== null ? store.price : '';
+  if (modalEl) modalEl.style.display = 'flex';
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+function closeEatOutStoreModal() {
+  const modalEl = document.getElementById('eatOutStoreEditModal');
+  if (modalEl) modalEl.style.display = 'none';
+  editingEatOutIndex = null;
+}
+function updateEatOutStore() {
+  if (editingEatOutIndex === null) return;
+  const nameEl = document.getElementById('editEatOutStoreName');
+  const priceEl = document.getElementById('editEatOutStorePrice');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const price = priceEl ? priceEl.value.trim() : '';
+  if (!name) { alert('店舗名を入力してください'); return; }
+  eatOutStores[editingEatOutIndex] = { name, price: price ? Number(price) : null };
+  localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+  closeEatOutStoreModal();
+  renderEatOutStores();
+}
+function deleteEatOutStoreFromModal() {
+  if (editingEatOutIndex === null) return;
+  if (confirm(`「${eatOutStores[editingEatOutIndex].name}」を削除しますか？`)) {
+    eatOutStores.splice(editingEatOutIndex, 1);
+    localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+    closeEatOutStoreModal();
+    renderEatOutStores();
+  }
+}
+
 function exportBackupData() {
-  const backupData = {
-    menus: menus,
-    masterIngredients: masterIngredients
-  };
-  
-  const jsonString = JSON.stringify(backupData, null, 2);
-  const blob = new Blob([jsonString], { type: 'text/plain;charset=utf-8' });
+  const data = { masterIngredients, eatOutStores, menus, shoppingList, stockList, currentSchedules, historyRecords, unitPrices };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  
-  const today = new Date().toISOString().split('T')[0];
-  a.download = `menu_backup_${today}.txt`;
-  
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = 'kondate_backup.json'; a.click();
 }
 
 function importBackupData(event) {
   const file = event.target.files[0];
-  if (!file, file === undefined) return;
-
+  if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      const content = e.target.result;
-      const data = JSON.parse(content);
-
-      if (!data.menus || !data.masterIngredients) {
-        return alert('ファイルの形式が正しくないか、献立データが含まれていません。');
-      }
-
-      if (confirm(`読み込んだファイルから以下のデータを復元します。\n・献立: ${data.menus.length}件\n・食材: ${data.masterIngredients.length}件\n\n※現在のデータに上書き・追加されます。よろしいですか？`)) {
-        menus = data.menus;
-        masterIngredients = data.masterIngredients;
-
-        localStorage.setItem('menus', JSON.stringify(menus));
-        localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-
-        sortMasterIngredients();
-        renderMenus();
-        renderMasterIngredients();
-        renderSelectableIngredients();
-        updateSelectionSummary();
-        renderManageMenus();
-
-        alert('データの読み込みが完了しました！');
-      }
-    } catch (err) {
-      alert('ファイルの読み込みに失敗しました。正しいバックアップファイル（TXT）を選択してください。');
-    }
-    event.target.value = '';
+      const data = JSON.parse(e.target.result);
+      if (data.masterIngredients) masterIngredients = data.masterIngredients;
+      if (data.eatOutStores) eatOutStores = data.eatOutStores;
+      if (data.menus) menus = data.menus;
+      if (data.shoppingList) shoppingList = data.shoppingList;
+      if (data.stockList) stockList = data.stockList;
+      if (data.currentSchedules) currentSchedules = data.currentSchedules;
+      if (data.historyRecords) historyRecords = data.historyRecords;
+      if (data.unitPrices) unitPrices = data.unitPrices;
+      
+      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+      localStorage.setItem('menus', JSON.stringify(menus));
+      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+      localStorage.setItem('stockList', JSON.stringify(stockList));
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+      localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+      
+      alert('データを正常に読み込みました！');
+      switchTab('tab1');
+    } catch(err) { alert('ファイルの読み込みに失敗しました。'); }
   };
   reader.readAsText(file);
+}
+
+function initIngredientInputs() {
+  const container = document.getElementById('ingredientInputs');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="edit-row">
+      <input type="text" placeholder="材料名" class="row-ing-name" style="width:55%; margin:0;">
+      <input type="number" placeholder="価格" class="row-ing-price" style="width:45%; margin:0;">
+    </div>
+  `;
+}
+
+function addIngredientRow() {
+  const container = document.getElementById('ingredientInputs');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'edit-row'; div.style.marginTop = '6px';
+  div.innerHTML = `
+    <input type="text" placeholder="材料名" class="row-ing-name" style="width:55%; margin:0;">
+    <input type="number" placeholder="価格" class="row-ing-price" style="width:45%; margin:0;">
+  `;
+  container.appendChild(div);
+}
+
+function saveMenu() {
+  const nameEl = document.getElementById('menuName');
+  if (!nameEl) return;
+  const name = nameEl.value.trim();
+  if (!name) { alert('献立名を入力してください'); return; }
+  const names = document.querySelectorAll('.row-ing-name');
+  const prices = document.querySelectorAll('.row-ing-price');
+  let ingredients = [];
+  for (let i = 0; i < names.length; i++) {
+    if (names[i].value.trim()) {
+      ingredients.push({ name: names[i].value.trim(), price: prices[i].value.trim() ? Number(prices[i].value.trim()) : null });
+    }
+  }
+  menus.push({ name, ingredients });
+  localStorage.setItem('menus', JSON.stringify(menus));
+  nameEl.value = '';
+  initIngredientInputs();
+  renderManageMenus();
+  alert('献立を保存しました！');
+}
+
+function renderManageMenus() {
+  const container = document.getElementById('manageMenuList');
+  if (!container) return;
+  if (menus.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center;">登録されている献立はありません。</p>';
+    return;
+  }
+  container.innerHTML = menus.map((menu, idx) => `
+    <div class="list-item menu-manage-item" data-index="${idx}">
+      <div>
+        <strong>${menu.name}</strong>
+        <div style="font-size:0.8rem; color:#666;">材料: ${menu.ingredients.map(i => i.name).join(', ')}</div>
+      </div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.menu-manage-item').forEach(item => {
+    let timer = null;
+    const idx = parseInt(item.getAttribute('data-index'));
+    const startLongPress = () => { timer = setTimeout(() => { openMenuModal(idx); }, 600); };
+    const cancelLongPress = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    item.addEventListener('mousedown', startLongPress);
+    item.addEventListener('mouseup', cancelLongPress);
+    item.addEventListener('mouseleave', cancelLongPress);
+    item.addEventListener('touchstart', startLongPress, { passive: true });
+    item.addEventListener('touchend', cancelLongPress);
+    item.addEventListener('touchcancel', cancelLongPress);
+  });
+}
+
+function openMenuModal(idx) {
+  editingMenuIndex = idx;
+  const menu = menus[idx];
+  const nameEl = document.getElementById('editMenuName');
+  const container = document.getElementById('editIngredientInputs');
+  const modalEl = document.getElementById('menuEditModal');
+  if (nameEl) nameEl.value = menu.name;
+  if (container) {
+    container.innerHTML = '';
+    if (menu.ingredients && menu.ingredients.length > 0) {
+      menu.ingredients.forEach(ing => {
+        const div = document.createElement('div');
+        div.className = 'edit-row'; div.style.marginTop = '6px';
+        div.innerHTML = `
+          <input type="text" placeholder="材料名" class="edit-row-ing-name" value="${ing.name}" style="width:55%; margin:0;">
+          <input type="number" placeholder="価格" class="edit-row-ing-price" value="${ing.price !== null ? ing.price : ''}" style="width:45%; margin:0;">
+        `;
+        container.appendChild(div);
+      });
+    } else { addEditIngredientRow(); }
+  }
+  if (modalEl) modalEl.style.display = 'flex';
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+function closeMenuModal() {
+  const modalEl = document.getElementById('menuEditModal');
+  if (modalEl) modalEl.style.display = 'none';
+  editingMenuIndex = null;
+}
+function addEditIngredientRow() {
+  const container = document.getElementById('editIngredientInputs');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'edit-row'; div.style.marginTop = '6px';
+  div.innerHTML = `
+    <input type="text" placeholder="材料名" class="edit-row-ing-name" style="width:55%; margin:0;">
+    <input type="number" placeholder="価格" class="edit-row-ing-price" style="width:45%; margin:0;">
+  `;
+  container.appendChild(div);
+}
+function updateMenu() {
+  if (editingMenuIndex === null) return;
+  const nameEl = document.getElementById('editMenuName');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { alert('献立名を入力してください'); return; }
+  const names = document.querySelectorAll('.edit-row-ing-name');
+  const prices = document.querySelectorAll('.edit-row-ing-price');
+  let ingredients = [];
+  for (let i = 0; i < names.length; i++) {
+    if (names[i].value.trim()) {
+      ingredients.push({ name: names[i].value.trim(), price: prices[i].value.trim() ? Number(prices[i].value.trim()) : null });
+    }
+  }
+  menus[editingMenuIndex] = { name, ingredients };
+  localStorage.setItem('menus', JSON.stringify(menus));
+  closeMenuModal();
+  renderManageMenus();
+}
+function duplicateMenuFromModal() {
+  if (editingMenuIndex === null) return;
+  const target = menus[editingMenuIndex];
+  const duplicated = JSON.parse(JSON.stringify(target));
+  duplicated.name = target.name + 'のコピー';
+  menus.splice(editingMenuIndex + 1, 0, duplicated);
+  localStorage.setItem('menus', JSON.stringify(menus));
+  closeMenuModal();
+  renderManageMenus();
+}
+function deleteMenuFromModal() {
+  if (editingMenuIndex === null) return;
+  if (confirm(`「${menus[editingMenuIndex].name}」を削除しますか？`)) {
+    menus.splice(editingMenuIndex, 1);
+    localStorage.setItem('menus', JSON.stringify(menus));
+    closeMenuModal();
+    renderManageMenus();
+  }
+}
+
+function isEatOutItem(name) {
+  if (!name) return false;
+  return eatOutStores.some(s => s.name === name);
+}
+
+function getMenuPrice(menuName) {
+  if (!menuName) return 0;
+  const foundMenu = menus.find(m => m.name === menuName);
+  if (foundMenu) {
+    let sum = 0;
+    foundMenu.ingredients.forEach(i => { if (i.price) sum += Number(i.price); });
+    return sum;
+  }
+  const foundStore = eatOutStores.find(s => s.name === menuName);
+  if (foundStore && foundStore.price) {
+    return Number(foundStore.price);
+  }
+  return 0;
+}
+
+function renderSchedule() {
+  const container = document.getElementById('currentScheduleTableBody');
+  if (!container) return;
+  let totalScheduleSum = 0;
+
+  container.innerHTML = fixedScheduleKeys.map((keyObj, index) => {
+    const keyStr = `${keyObj.day}_${keyObj.time}`;
+    const data = currentSchedules[keyStr] || { name: '', completed: false, excludePrice: false };
+    
+    const basePrice = getMenuPrice(data.name);
+    const effectivePrice = data.excludePrice ? 0 : basePrice;
+    totalScheduleSum += effectivePrice;
+
+    let dayColor = '#333';
+    if (keyObj.day === '日') {
+      dayColor = '#d32f2f';
+    } else if (keyObj.day === '土') {
+      dayColor = '#03A9F4';
+    }
+
+    const isEatOut = isEatOutItem(data.name);
+    const inputClass = isEatOut ? 'schedule-input is-eatout' : 'schedule-input';
+
+    const priceDisplay = basePrice > 0 
+      ? (data.excludePrice ? `<span style="text-decoration: line-through; color: #ccc;">${basePrice.toLocaleString()}円</span> <span style="font-size:0.75rem; color:#999;">(除外)</span>` : basePrice.toLocaleString() + '円')
+      : '-';
+
+    return `
+      <tr class="schedule-row ${data.completed ? 'completed' : ''}" id="sched-row-${index}">
+        <td style="font-weight: bold; color: ${dayColor};">${keyObj.day}(${keyObj.time})</td>
+        <td>
+          <div class="schedule-input-container">
+            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${data.name || ''}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
+            <div class="suggest-box" id="suggest-box-${index}" onmousedown="event.preventDefault()"></div>
+          </div>
+        </td>
+        <td style="text-align: right; font-weight: bold; cursor: pointer; color: ${basePrice > 0 && !data.excludePrice ? '#2e7d32' : '#888'};" onclick="toggleSchedulePrice('${keyObj.day}', '${keyObj.time}')" title="タッチして金額の含める/除外を切り替え">
+          ${priceDisplay}
+        </td>
+        <td style="text-align: center;">
+          <button style="background: #4CAF50; color: white; border: none; border-radius: 4px; width: 28px; height: 28px; font-size: 0.85rem; cursor: pointer;" title="食べたことにする" onclick="toggleCompleteSchedule('${keyObj.day}', '${keyObj.time}', ${index})">✓</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const totalPriceEl = document.getElementById('totalSchedulePrice');
+  if (totalPriceEl) {
+    totalPriceEl.textContent = totalScheduleSum.toLocaleString();
+  }
+}
+
+function toggleSchedulePrice(day, time) {
+  const keyStr = `${day}_${time}`;
+  if (!currentSchedules[keyStr]) return;
+  
+  currentSchedules[keyStr].excludePrice = !currentSchedules[keyStr].excludePrice;
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  
+  renderSchedule();
+}
+
+function resetAllSchedules() {
+  if (confirm('今週のスケジュール（入力内容やチェック状態）をすべてリセットしますか？この操作は元に戻せません。')) {
+    localStorage.removeItem('currentSchedules');
+    currentSchedules = {};
+    renderSchedule();
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.schedule-input-container')) {
+    document.querySelectorAll('.suggest-box').forEach(box => box.style.display = 'none');
+  }
+});
+
+function toHiragana(str) {
+  return str.replace(/[\u30a1-\u30f6]/g, match => {
+    return String.fromCharCode(match.charCodeAt(0) - 0x60);
+  });
+}
+
+function onScheduleInput(day, time, index) {
+  const inputEl = document.getElementById(`sched-input-${index}`);
+  const suggestBox = document.getElementById(`suggest-box-${index}`);
+  if (!inputEl) return;
+  const val = inputEl.value.trim();
+
+  const keyStr = `${day}_${time}`;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
+  currentSchedules[keyStr].name = inputEl.value;
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+
+  if (isEatOutItem(inputEl.value)) {
+    inputEl.classList.add('is-eatout');
+  } else {
+    inputEl.classList.remove('is-eatout');
+  }
+
+  let totalScheduleSum = 0;
+  fixedScheduleKeys.forEach((kObj) => {
+    const kStr = `${kObj.day}_${kObj.time}`;
+    const d = currentSchedules[kStr] || { name: '', completed: false, excludePrice: false };
+    const p = getMenuPrice(d.name);
+    if (!d.excludePrice) totalScheduleSum += p;
+  });
+  
+  const totalPriceEl = document.getElementById('totalSchedulePrice');
+  if (totalPriceEl) {
+    totalPriceEl.textContent = totalScheduleSum.toLocaleString();
+  }
+  
+  const priceCell = document.querySelector(`#sched-row-${index} td:nth-child(3)`);
+  const currentPrice = getMenuPrice(inputEl.value);
+  const isExcluded = currentSchedules[keyStr].excludePrice;
+  
+  if (priceCell) {
+    if (currentPrice > 0) {
+      priceCell.innerHTML = isExcluded 
+        ? `<span style="text-decoration: line-through; color: #ccc;">${currentPrice.toLocaleString()}円</span> <span style="font-size:0.75rem; color:#999;">(除外)</span>` 
+        : currentPrice.toLocaleString() + '円';
+      priceCell.style.color = isExcluded ? '#888' : '#2e7d32';
+    } else {
+      priceCell.textContent = '-';
+      priceCell.style.color = '#888';
+    }
+  }
+
+  if (!suggestBox) return;
+  let candidates = [];
+  menus.forEach(m => candidates.push(m.name));
+  eatOutStores.forEach(s => candidates.push(s.name));
+
+  const normalizedVal = toHiragana(val).toLowerCase();
+
+  const matches = val === '' 
+    ? candidates 
+    : candidates.filter(name => {
+        const normalizedName = toHiragana(name).toLowerCase();
+        return normalizedName.includes(normalizedVal);
+      });
+
+  if (matches.length > 0) {
+    suggestBox.innerHTML = matches.map(name => `
+      <div class="suggest-item" onclick="selectSuggest('${day}', '${time}', ${index}, '${name.replace(/'/g, "\\'")}')">${name}</div>
+    `).join('');
+    suggestBox.style.display = 'block';
+  } else {
+    suggestBox.style.display = 'none';
+  }
+}
+
+function selectSuggest(day, time, index, menuName) {
+  const inputEl = document.getElementById(`sched-input-${index}`);
+  if (inputEl) inputEl.value = menuName;
+  const box = document.getElementById(`suggest-box-${index}`);
+  if (box) box.style.display = 'none';
+
+  const keyStr = `${day}_${time}`;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
+  currentSchedules[keyStr].name = menuName;
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  renderSchedule();
+}
+
+function toggleCompleteSchedule(day, time, index) {
+  const keyStr = `${day}_${time}`;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
+  const item = currentSchedules[keyStr];
+  if (!item.name || item.name.trim() === '') return;
+
+  const matchedMenu = menus.find(m => m.name === item.name);
+
+  if (!item.completed) {
+    item.completed = true;
+    if (matchedMenu && matchedMenu.ingredients) {
+      matchedMenu.ingredients.forEach(ing => {
+        let stockItem = stockList.find(s => s.name === ing.name);
+        if (stockItem) { stockItem.qty -= 1; if (stockItem.qty < 0) stockItem.qty = 0; }
+      });
+      localStorage.setItem('stockList', JSON.stringify(stockList));
+    }
+
+    const now = new Date();
+    historyRecords.unshift({
+      id: Date.now() + Math.random(),
+      name: item.name,
+      day: day,
+      time: time,
+      date: `${now.getMonth() + 1}/${now.getDate()}`,
+      group: `${now.getFullYear()}年${now.getMonth() + 1}月 第${Math.ceil(now.getDate() / 7)}週`
+    });
+    localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+  } else {
+    item.completed = false;
+    if (matchedMenu && matchedMenu.ingredients) {
+      matchedMenu.ingredients.forEach(ing => {
+        let stockItem = stockList.find(s => s.name === ing.name);
+        if (stockItem) { stockItem.qty += 1; }
+      });
+      localStorage.setItem('stockList', JSON.stringify(stockList));
+    }
+
+    const hIdx = historyRecords.findIndex(h => h.name === item.name && h.day === day && h.time === time);
+    if (hIdx !== -1) {
+      historyRecords.splice(hIdx, 1);
+      localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+    }
+  }
+
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  renderSchedule();
+  renderHistory();
+}
+
+function renderHistory() {
+  const container = document.getElementById('historyListContainer');
+  if (!container) return;
+  if (historyRecords.length === 0) {
+    container.innerHTML = '<p style="color:#888; text-align:center; padding:10px 0;">まだ食べた記録はありません。</p>';
+    return;
+  }
+
+  const grouped = {};
+  historyRecords.forEach((r, originalIdx) => {
+    const g = r.group || 'そのほか';
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push({ ...r, originalIdx });
+  });
+
+  container.innerHTML = Object.keys(grouped).map(gName => `
+    <div class="accordion-group">
+      <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        📂 ${gName} <span style="font-size:0.8rem; background:#fff; padding:2px 8px; border-radius:10px; color:#2e7d32;">${grouped[gName].length}件 ▼</span>
+      </div>
+      <div class="accordion-content open">
+        ${grouped[gName].map(item => `
+          <div class="history-row history-item" data-index="${item.originalIdx}" title="長押しするとこの記録を削除できます">
+            <span>${item.name} (<span style="color:#2e7d32;">${item.day}</span> <span style="color:#e65100;">${item.time}</span>)</span>
+            <span style="font-size:0.75rem; color:#888;">${item.date}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.history-item').forEach(item => {
+    let timer = null;
+    const idx = parseInt(item.getAttribute('data-index'));
+    const startLongPress = () => {
+      timer = setTimeout(() => {
+        if (confirm(`「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
+          historyRecords.splice(idx, 1);
+          localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+          renderHistory();
+          if (navigator.vibrate) navigator.vibrate(50);
+        }
+      }, 600);
+    };
+    const cancelLongPress = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    item.addEventListener('mousedown', startLongPress);
+    item.addEventListener('mouseup', cancelLongPress);
+    item.addEventListener('mouseleave', cancelLongPress);
+    item.addEventListener('touchstart', startLongPress, { passive: true });
+    item.addEventListener('touchend', cancelLongPress);
+    item.addEventListener('touchcancel', cancelLongPress);
+  });
+}
+
+function exportHistoryTxt() {
+  if (historyRecords.length === 0) { alert('出力する履歴がありません。'); return; }
+  let textContent = '【 食べた記録（履歴） 】\n\n';
+  const grouped = {};
+  historyRecords.forEach(r => {
+    const g = r.group || 'そのほか';
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(r);
+  });
+  Object.keys(grouped).forEach(gName => {
+    textContent += `--- ${gName} ---\n`;
+    grouped[gName].forEach(item => {
+      textContent += `[${item.date}] ${item.day}(${item.time}): ${item.name}\n`;
+    });
+    textContent += '\n';
+  });
+  const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'kondate_history.txt'; a.click();
+}
+
+function clearHistory() {
+  if (confirm('食べた記録をすべてリセットしますか？')) {
+    historyRecords = [];
+    localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+    renderHistory();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+  initIngredientInputs();
+  renderSchedule();
+  renderHistory();
+});
+
+function resetAllStock() {
+  if (confirm('在庫リストをすべて削除してまっすぐにしますか？')) {
+    stockList = [];
+    localStorage.setItem('stockList', JSON.stringify(stockList));
+    renderStock();
+  }
 }
