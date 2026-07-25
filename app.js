@@ -120,7 +120,7 @@ function saveMenu() {
   alert('献立と食材を保存しました！');
 }
 
-// 献立一覧の描画（右端に中央揃えボタン配置）
+// 献立一覧の描画
 function renderMenus() {
   const list = document.getElementById('menuList');
   if (!list) return;
@@ -130,7 +130,6 @@ function renderMenus() {
     return;
   }
 
-  // ボタン中央揃え用共通CSS
   const btnStyleMinus = "width:28px; height:28px; border-radius:50%; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
   const btnStylePlus = "width:28px; height:28px; border-radius:50%; border:1px solid #4CAF50; background:#e8f5e9; color:#2e7d32; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
 
@@ -158,7 +157,7 @@ function renderMenus() {
   });
 }
 
-// 食材一覧の描画（右端に中央揃えボタン配置）
+// 食材一覧の描画
 function renderSelectableIngredients() {
   const container = document.getElementById('selectIngList');
   if (!container) return;
@@ -169,7 +168,6 @@ function renderSelectableIngredients() {
     return;
   }
 
-  // ボタン中央揃え用共通CSS
   const btnStyleMinus = "width:28px; height:28px; border-radius:50%; border:1px solid #ccc; background:#fff; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
   const btnStylePlus = "width:28px; height:28px; border-radius:50%; border:1px solid #4CAF50; background:#e8f5e9; color:#2e7d32; font-weight:bold; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1;";
 
@@ -195,7 +193,6 @@ function renderSelectableIngredients() {
   });
 }
 
-// 行全体のタップ判定（0個なら1個選択、すでに1個以上選択済なら解除）
 function toggleRowSelect(textDiv, type) {
   const row = textDiv.parentElement;
   const checkbox = row.querySelector('input[type="checkbox"]');
@@ -214,9 +211,8 @@ function toggleRowSelect(textDiv, type) {
   updateSelectionSummary();
 }
 
-// ボタンによる数量変更 (+ / -)
 function changeQty(btn, delta, type) {
-  event.stopPropagation(); // 行全体のクリックイベント発火を防ぐ
+  event.stopPropagation();
   const row = btn.closest('div.menu-item-row, div.ing-item-row');
   const checkbox = row.querySelector('input[type="checkbox"]');
   const countSpan = row.querySelector('.qty-count');
@@ -232,7 +228,6 @@ function changeQty(btn, delta, type) {
   updateSelectionSummary();
 }
 
-// 選択状態と回数（個数）を取得して重なり合算
 function getSelectedItemsData() {
   const selectedMenus = [];
   const selectedIngs = [];
@@ -256,12 +251,10 @@ function getSelectedItemsData() {
   return { selectedMenus, selectedIngs };
 }
 
-// 重複の合算（回数倍率考慮）＋ 50音順ソート処理
 function getConsolidatedIngredients() {
   const { selectedMenus, selectedIngs } = getSelectedItemsData();
-  const ingMap = {}; // 食材名ごとの合計金額と個数を管理
+  const ingMap = {};
 
-  // 1. 選択された献立の材料を回数(qty)倍して集計
   selectedMenus.forEach(item => {
     const menu = menus.find(m => m.id === item.id);
     if (menu) {
@@ -277,7 +270,6 @@ function getConsolidatedIngredients() {
     }
   });
 
-  // 2. 単体で直接選択された食材を回数(qty)倍して集計
   selectedIngs.forEach(item => {
     const ing = masterIngredients[item.index];
     if (ing) {
@@ -291,20 +283,17 @@ function getConsolidatedIngredients() {
     }
   });
 
-  // 連想配列を配列に変換
   const consolidatedList = Object.keys(ingMap).map(name => ({
     name: name,
     price: ingMap[name].price,
     count: ingMap[name].count
   }));
 
-  // 3. 50音順（あいうえお順）に並べ替え
   consolidatedList.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
   return consolidatedList;
 }
 
-// ボタン下のプレビュー表示
 function updateSelectionSummary() {
   const container = document.getElementById('selectedItemsSummary');
   if (!container) return;
@@ -333,7 +322,6 @@ function updateSelectionSummary() {
   container.innerHTML = html;
 }
 
-// 買い物リスト生成
 function generateShoppingList() {
   const consolidatedList = getConsolidatedIngredients();
 
@@ -405,6 +393,7 @@ function backToMenuSelect() {
   document.getElementById('shoppingListCard').style.display = 'none';
 }
 
+// 登録済み献立の管理エリア描画（削除ボタンのサイズ・形状をコンパクトに修正）
 function renderManageMenus() {
   const container = document.getElementById('manageMenuList');
   if (!container) return;
@@ -422,9 +411,10 @@ function renderManageMenus() {
     let ingHtml = '';
     menu.ingredients.forEach((ing, ingIndex) => {
       ingHtml += `
-        <div class="edit-row">
-          <input type="text" value="${ing.name}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'name', this.value)">
-          <input type="number" value="${ing.price}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'price', this.value)"> 円
+        <div class="edit-row" style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center;">
+          <input type="text" value="${ing.name}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'name', this.value)" style="flex: 1; min-width: 0;">
+          <input type="number" value="${ing.price}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'price', this.value)" style="width: 65px; flex-shrink: 0;"> 円
+          <button type="button" onclick="deleteIngredientFromMenu(${menuIndex}, ${ingIndex})" style="width: 28px; height: 28px; min-width: 28px; flex-shrink: 0; background: #ff7043; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;">×</button>
         </div>
       `;
     });
@@ -434,10 +424,27 @@ function renderManageMenus() {
       <input type="text" value="${menu.name}" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 8px;" onchange="updateMenuName(${menuIndex}, this.value)">
       <label style="font-size: 0.8rem; color: #666;">材料・価格:</label>
       ${ingHtml}
+      <button type="button" onclick="addIngredientToMenu(${menuIndex})" style="background: #e8f5e9; color: #2e7d32; border: 1px solid #4CAF50; border-radius: 4px; padding: 6px 12px; margin: 6px 0 12px 0; cursor: pointer; width: 100%; font-weight: bold;">＋ 材料を追加</button>
       <button class="danger-btn" onclick="deleteMenu(${menuIndex})">この献立を削除</button>
     `;
     container.appendChild(div);
   });
+}
+
+// 登録済みの献立に新しい材料行を追加
+function addIngredientToMenu(menuIndex) {
+  menus[menuIndex].ingredients.push({ name: '', price: 0 });
+  localStorage.setItem('menus', JSON.stringify(menus));
+  renderManageMenus();
+  renderMenus();
+}
+
+// 登録済み献立から特定の材料を削除
+function deleteIngredientFromMenu(menuIndex, ingIndex) {
+  menus[menuIndex].ingredients.splice(ingIndex, 1);
+  localStorage.setItem('menus', JSON.stringify(menus));
+  renderManageMenus();
+  renderMenus();
 }
 
 function updateMenuName(menuIndex, newName) {
@@ -450,6 +457,20 @@ function updateMenuName(menuIndex, newName) {
 function updateIngredient(menuIndex, ingIndex, field, value) {
   if (field === 'price') value = parseInt(value) || 0;
   menus[menuIndex].ingredients[ingIndex][field] = value;
+  
+  if (field === 'name' && value.trim() !== '') {
+    const ingName = value.trim();
+    const ingPrice = menus[menuIndex].ingredients[ingIndex].price || 0;
+    const existsIndex = masterIngredients.findIndex(item => item.name === ingName);
+    if (existsIndex === -1) {
+      masterIngredients.push({ name: ingName, price: ingPrice });
+      sortMasterIngredients();
+      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      renderMasterIngredients();
+      renderSelectableIngredients();
+    }
+  }
+
   localStorage.setItem('menus', JSON.stringify(menus));
   renderMenus();
 }
