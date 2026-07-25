@@ -5,6 +5,9 @@ if ('serviceWorker' in navigator) {
 let menus = JSON.parse(localStorage.getItem('menus')) || [];
 let masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
 
+// 🛒 お買い物リストの操作履歴（アンドゥ用）
+let shoppingHistoryStack = [];
+
 function sortMasterIngredients() {
   masterIngredients.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 }
@@ -330,6 +333,7 @@ function updateSelectionSummary() {
   container.innerHTML = html;
 }
 
+// ── 買い物リストを生成（または既存の購入状態を維持して追加分をマージ） ──
 function generateShoppingList() {
   const consolidatedList = getConsolidatedIngredients();
   const { selectedMenus } = getSelectedItemsData();
@@ -338,14 +342,12 @@ function generateShoppingList() {
     return alert('献立または食材を1つ以上選択してください');
   }
 
-  // ★追加: stock.html 側の「食べる予定リスト」へ選択された献立を連携・保存する処理
   let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
   
   selectedMenus.forEach(item => {
     const menu = menus.find(m => m.id === item.id);
     if (menu) {
       for (let i = 0; i < item.qty; i++) {
-        // 重複しにくいユニークなIDと、必要な食材リストを持たせる
         currentSchedules.push({
           id: Date.now() + Math.random(),
           name: menu.name,
@@ -358,139 +360,158 @@ function generateShoppingList() {
     }
   });
   localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-  // -------------------------------------------------------------
 
   const shoppingList = document.getElementById('shoppingList');
+  
+  // 既にリストが存在する場合（追加で戻ってきた場合）は、既存の「購入済み状態」を退避する
+  const existingPurchasedMap = {};
+  shoppingList.querySelectorAll('li').forEach(li => {
+    const nameText = li.querySelector('.item-name-text').textContent;
+    const isPurchased = li.classList.contains('purchased');
+    existingPurchasedMap[nameText] = isPurchased;
+  });
+
   shoppingList.innerHTML = '';
 
   consolidatedList.forEach(item => {
-    addShoppingListItem(item.name, item.price, item.count);
+    const displayName = item.count > 1 ? `${item.name} (×${item.count})` : item.name;
+    const wasPurchased = existingPurchasedMap[displayName] || false;
+    addShoppingListItem(item.name, item.price, item.count, wasPurchased);
   });
 
+  shoppingHistoryStack = [];
+  updateUndoButtonState();
   updateShoppingTotals();
 
   document.getElementById('menuSelectCard').style.display = 'none';
   document.getElementById('shoppingListCard').style.display = 'block';
 }
 
-function addShoppingListItem(name, price, count) {
+// ── 履歴を保存する関数 ──
+function saveShoppingStateToHistory() {
+  const shoppingList = document.getElementById('shoppingList');
+  if (!shoppingList) return;
+  const htmlState = shoppingList.innerHTML;
+  shoppingHistoryStack.push(htmlState);
+  if (shoppingHistoryStack.length > 15) {
+    shoppingHistoryStack.shift();
+  }
+  updateUndoButtonState();
+}
+
+// ── 「元に戻す」ボタンの有効・無効切り替え ──
+function updateUndoButtonState() {
+  const undoBtn = document.getElementById('undoShoppingBtn');
+  if (undoBtn) {
+    if (shoppingHistoryStack.length > 0) {
+      undoBtn.style.opacity = '1';
+      undoBtn.style.cursor = 'pointer';
+      undoBtn.disabled = false;
+    } else {
+      undoBtn.style.opacity = '0.4';
+      undoBtn.style.cursor = 'default';
+      undoBtn.disabled = true;
+    }
+  }
+}
+
+// ── 操作を1つ元に戻す（Undo） ──
+function undoShoppingAction() {
+  if (shoppingHistoryStack.length === 0) return;
+  const previousStateHtml = shoppingHistoryStack.pop();
+  const shoppingList = document.getElementById('shoppingList');
+  if (shoppingList) {
+    shoppingList.innerHTML = previousStateHtml;
+    rebindShoppingListEvents();
+    updateShoppingTotals();
+  }
+  updateUndoButtonState();
+}
+
+// 復元された要素のイベントを再紐付け
+function rebindShoppingListEvents() {
+  const items = document.querySelectorAll('#shoppingList li');
+  items.forEach(li => {
+    const clickableArea = li.querySelector('.item-main-clickable');
+    const deleteBtn = li.querySelector('.delete-item-btn');
+    if (!clickableArea || !deleteBtn) return;
+
+    clickableArea.addEventListener('click', () => {
+      saveShoppingStateToHistory();
+      li.classList.toggle('purchased');
+      if (li.classList.contains('purchased')) {
+        li.style.background = '#f1f3f4';
+        li.style.color = '#888';
+        li.style.borderColor = '#ddd';
+        clickableArea.style.textDecoration = 'line-through';
+      } else {
+        li.style.background = '#fff';
+        li.style.color = '#333';
+        li.style.borderColor = '#e0e0e0';
+        clickableArea.style.textDecoration = 'none';
+      }
+      updateShoppingTotals();
+    });
+
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      saveShoppingStateToHistory();
+      li.remove();
+      updateShoppingTotals();
+    });
+  });
+}
+
+function addShoppingListItem(name, price, count, isPurchased = false) {
   const shoppingList = document.getElementById('shoppingList');
   const li = document.createElement('li');
   li.setAttribute('data-price', price || 0);
+  
+  // 購入済み状態（isPurchased）に応じて初期スタイルを切り替える
+  if (isPurchased) {
+    li.classList.add('purchased');
+    li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background: #f1f3f4; color: #888; border: 1px solid #ddd; border-radius: 6px; font-weight: 500; user-select: none;';
+  } else {
+    li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 6px; background: #fff; color: #333; border: 1px solid #e0e0e0; border-radius: 6px; font-weight: 500; user-select: none;';
+  }
 
   const displayName = count > 1 ? `${name} (×${count})` : name;
-  li.innerHTML = `<span>${displayName}</span><span>${price}円</span>`;
-  
-  let startX = 0;
-  let currentX = 0;
-  let isDragging = false;
-  let hasMoved = false;
 
-  // タッチ操作（スマホ用）
-  li.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    currentX = startX;
-    isDragging = true;
-    hasMoved = false;
-    li.style.transition = 'none';
-  }, { passive: true });
+  li.innerHTML = `
+    <div class="item-main-clickable" style="display: flex; justify-content: space-between; align-items: center; flex: 1; cursor: pointer; margin-right: 10px; ${isPurchased ? 'text-decoration: line-through;' : ''}">
+      <span class="item-name-text">${displayName}</span>
+      <span class="item-price-text" style="margin-left: 10px;">${price}円</span>
+    </div>
+    <button type="button" class="delete-item-btn" style="background: #ff7043; color: white; border: none; border-radius: 4px; padding: 6px 10px; font-size: 0.8rem; font-weight: bold; cursor: pointer; flex-shrink: 0;">消す</button>
+  `;
 
-  li.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
-    currentX = e.touches[0].clientX;
-    let diff = currentX - startX;
+  const clickableArea = li.querySelector('.item-main-clickable');
+  const deleteBtn = li.querySelector('.delete-item-btn');
 
-    if (Math.abs(diff) > 5) {
-      hasMoved = true;
-    }
-
-    if (diff < 0) {
-      li.style.transform = `translateX(${diff}px)`;
-      li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
-    }
-  }, { passive: true });
-
-  li.addEventListener('touchend', (e) => {
-    if (!isDragging) return;
-    isDragging = false;
-    let diff = currentX - startX;
-    li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-
-    if (diff < -80) {
-      li.style.transform = 'translateX(-100%)';
-      li.style.opacity = '0';
-      setTimeout(() => {
-        li.remove();
-        updateShoppingTotals();
-      }, 200);
-    } else if (!hasMoved || Math.abs(diff) <= 10) {
-      e.preventDefault();
-      li.style.transform = 'translateX(0)';
-      li.style.opacity = '1';
-      li.classList.toggle('purchased');
-      updateShoppingTotals();
-    } else {
-      li.style.transform = 'translateX(0)';
-      li.style.opacity = '1';
-    }
-    
-    startX = 0;
-    currentX = 0;
-  });
-
-  // マウス操作（PC用）
-  li.addEventListener('click', (e) => {
-    if (hasMoved) return;
+  // タップで「購入済み（取り消し線）」の切り替え
+  clickableArea.addEventListener('click', () => {
+    saveShoppingStateToHistory();
     li.classList.toggle('purchased');
+    if (li.classList.contains('purchased')) {
+      li.style.background = '#f1f3f4';
+      li.style.color = '#888';
+      li.style.borderColor = '#ddd';
+      clickableArea.style.textDecoration = 'line-through';
+    } else {
+      li.style.background = '#fff';
+      li.style.color = '#333';
+      li.style.borderColor = '#e0e0e0';
+      clickableArea.style.textDecoration = 'none';
+    }
     updateShoppingTotals();
   });
 
-  li.addEventListener('mousedown', (e) => {
-    startX = e.clientX;
-    currentX = startX;
-    isDragging = true;
-    hasMoved = false;
-    li.style.transition = 'none';
-
-    const onMouseMove = (ev) => {
-      if (!isDragging) return;
-      currentX = ev.clientX;
-      let diff = currentX - startX;
-      if (Math.abs(diff) > 5) {
-        hasMoved = true;
-      }
-      if (diff < 0) {
-        li.style.transform = `translateX(${diff}px)`;
-        li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
-      }
-    };
-
-    const onMouseUp = () => {
-      if (!isDragging) return;
-      isDragging = false;
-      let diff = currentX - startX;
-      li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-
-      if (diff < -80) {
-        li.style.transform = 'translateX(-100%)';
-        li.style.opacity = '0';
-        setTimeout(() => {
-          li.remove();
-          updateShoppingTotals();
-        }, 200);
-      } else {
-        li.style.transform = 'translateX(0)';
-        li.style.opacity = '1';
-      }
-
-      startX = 0;
-      currentX = 0;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+  // 「消す」ボタンを押したらリストから完全に削除
+  deleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveShoppingStateToHistory();
+    li.remove();
+    updateShoppingTotals();
   });
 
   shoppingList.appendChild(li);
@@ -780,6 +801,9 @@ function exportMenuTxt() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  // stock.htmlを新しく開く
+  window.open('stock.html', '_blank');
 }
 
 // --- バックアップ・データ共有（エクスポート・インポート）機能 ---
@@ -806,7 +830,7 @@ function exportBackupData() {
 
 function importBackupData(event) {
   const file = event.target.files[0];
-  if (!file) return;
+  if (!file, file === undefined) return;
 
   const reader = new FileReader();
   reader.onload = function(e) {

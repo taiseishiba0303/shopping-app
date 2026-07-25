@@ -3,146 +3,1195 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>献立・お買い物リスト</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+  <title>献立・お買い物リスト・在庫スケジュール管理</title>
   <meta name="theme-color" content="#4CAF50">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .tab-bar {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 4px;
+      text-align: center;
+      background: white;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-bottom: 3px solid #2e7d32;
+    }
+    .tab-content {
+      display: none;
+      padding-top: 16px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      margin-bottom: 16px;
+    }
+    h2 { font-size: 1.1rem; color: #2e7d32; margin-top: 0; }
+    .subtitle { font-size: 0.85rem; color: #666; margin-bottom: 12px; }
+    .primary-btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      font-size: 0.95rem;
+    }
+    .primary-btn:hover { background: #388E3C; }
+    .secondary-btn {
+      background: #f1f3f4;
+      color: #333;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      font-size: 0.9rem;
+    }
+    input, select, textarea {
+      font-size: 0.95rem;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .edit-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .select-list, .shopping-list { list-style: none; padding: 0; margin: 0; }
+    .list-item, .select-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .shopping-item.completed {
+      background: #f1f3f4;
+      color: #888;
+      text-decoration: line-through;
+    }
+    .qty-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .qty-btn {
+      background: #ddd;
+      border: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+    .qty-btn:hover { background: #ccc; }
+    .qty-num {
+      font-weight: bold;
+      min-width: 20px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    
+    .schedule-row-simple {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .schedule-row-simple.completed {
+      background: #f1f3f4;
+      color: #888;
+      border-color: #ddd;
+      text-decoration: line-through;
+    }
+    .schedule-controls { display: flex; gap: 6px; align-items: center; }
+    .select-mini { padding: 4px 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; background: #fff; width: auto; margin: 0; }
+    .btn-del-sm { background: #ff7043; color: white; border: none; border-radius: 4px; width: 26px; height: 26px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    
+    .accordion-group {
+      margin-bottom: 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      background: #f9f9f9;
+      padding: 10px 14px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+    .accordion-content { display: none; padding: 10px 14px; background: #fff; border-top: 1px solid #e0e0e0; }
+    .accordion-content.open { display: block; }
+    .history-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 0.9rem; cursor: pointer; user-select: none; }
+    .footer-actions { display: flex; justify-content: space-between; margin-top: 12px; gap: 8px; }
+    .btn-danger { background: #d32f2f; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; width: auto; }
+
+    /* モーダルポップアップ用スタイル */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-box {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+    .modal-box h3 { margin-top: 0; color: #2e7d32; font-size: 1.1rem; }
+  </style>
 </head>
 <body>
 
-  <!-- タブ切り替えボタン -->
   <div class="tab-bar">
     <button id="tabBtn1" class="tab-btn active" onclick="switchTab('tab1')">🛒 買い物</button>
     <button id="tabBtn2" class="tab-btn" onclick="switchTab('tab2')">🥦 食材登録</button>
     <button id="tabBtn3" class="tab-btn" onclick="switchTab('tab3')">📝 献立</button>
+    <button id="tabBtn4" class="tab-btn" onclick="switchTab('tab4')">📦 在庫</button>
+    <button id="tabBtn5" class="tab-btn" onclick="switchTab('tab5')">📅 予定・履歴</button>
   </div>
 
-  <!-- タブ1: 買い物リスト作成 -->
-  <div id="tab1" class="tab-content active">
-    
-    <!-- 献立選定画面 -->
-    <div id="menuSelectCard" class="card">
-      <h2>献立・食材を選んでリスト作成</h2>
-      <p class="subtitle">作りたい献立や足りない食材を選んでください</p>
-      
-      <!-- サブタブ切り替え -->
-      <div class="sub-tab-bar" style="display: flex; margin-bottom: 15px; border-bottom: 2px solid #ddd;">
-        <button type="button" id="subTabMenuBtn" class="sub-tab-btn active" onclick="switchSubTab('menu')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; border-bottom: 3px solid #4CAF50; color: #4CAF50;">献立から選ぶ</button>
-        <button type="button" id="subTabIngBtn" class="sub-tab-btn" onclick="switchSubTab('ing')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; color: #666;">食材一覧から選ぶ</button>
-      </div>
-
-      <!-- サブタブ1: 献立一覧 -->
-      <div id="subTabMenuContent" class="sub-tab-content" style="display: block;">
-        <div id="menuList" class="select-list"></div>
-      </div>
-
-      <!-- サブタブ2: 食材一覧 -->
-      <div id="subTabIngContent" class="sub-tab-content" style="display: none;">
-        <div id="selectIngList" class="select-list"></div>
-      </div>
-
-      <!-- 選択中の合計サマリーエリア -->
-      <div id="selectedItemsSummary" class="selected-summary-box" style="margin-top: 15px; background: #f0f7f4; border: 1px solid #c8e6c9; border-radius: 6px; padding: 12px;">
-        <p class="summary-empty">選択中の項目はありません</p>
-      </div>
-
-      <button type="button" onclick="generateShoppingList()" class="primary-btn" style="margin-top: 15px;">お買い物リストを作成する</button>
-    </div>
-
-    <!-- お買い物リスト画面 -->
-    <div id="shoppingListCard" class="card" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2 style="margin: 0;">お買い物リスト</h2>
-        <button type="button" onclick="backToMenuSelect()" style="background: #78909c; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">← 選択画面に戻る</button>
-      </div>
-      <p class="subtitle">カゴに入れたらタップ（または左スワイプ）で消せます</p>
-      
-      <div class="summary-box" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
-          <span>カゴの中 (購入済み):</span>
-          <span><strong><span id="purchasedPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="purchasedTax">0</span>円)</span></span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
-          <span>残り (未購入):</span>
-          <span><strong><span id="remainingPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="remainingTax">0</span>円)</span></span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold; color: #2e7d32; border-top: 1px solid #eee; padding-top: 6px; margin-top: 6px;">
-          <span>合計金額:</span>
-          <span><span id="totalPrice">0</span>円 <span style="font-size:0.8em; font-weight:normal; color:#555;">(税込 <span id="totalTax">0</span>円)</span></span>
-        </div>
-      </div>
-
-      <ul id="shoppingList" class="shopping-list"></ul>
-      
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <a href="stock.html" style="flex: 1; background: #ff9800; color: white; border: none; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block;">📜 食べた履歴（stock）を見る</a>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- タブ2: 食材登録 -->
-  <div id="tab2" class="tab-content">
-    <div class="card">
-      <h2>新しい食材の登録</h2>
-      <p class="subtitle">よく使う食材や単体をあらかじめ登録しておけます</p>
-      <div class="edit-row">
-        <input type="text" id="masterIngName" placeholder="食材名 (例: 豚肉)" style="width: 50%;">
-        <input type="number" id="masterIngPrice" placeholder="価格 (円)" style="width: 35%;">
-      </div>
-      <button type="button" onclick="saveMasterIngredient()" class="primary-btn">食材を登録する</button>
-    </div>
-
-    <!-- 一括登録カード -->
-    <div class="card">
-      <h2>🥦 食材の一括登録</h2>
-      <p class="subtitle">メモ帳やAIなどで出力された「食材名 価格」のリストをまとめて貼り付けて登録できます。</p>
-      <textarea id="bulkIngInput" placeholder="例：&#13;&#10;にんじん 120&#13;&#10;玉ねぎ 100&#13;&#10;じゃがいも 150" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; box-sizing: border-box; font-size: 0.95rem;"></textarea>
-      <button type="button" onclick="saveBulkIngredients()" class="primary-btn" style="background: #2e7d32;">まとめて登録する</button>
-    </div>
-
-    <div class="card">
-      <h2>登録済み食材一覧</h2>
-      <div id="masterIngList"></div>
-    </div>
-
-    <!-- データ共有・バックアップ用パネル -->
-    <div class="card" style="margin-top: 20px; background: #f9f9f9; border: 1px dashed #ccc;">
-      <h3>💾 データ共有・バックアップ</h3>
-      <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">献立や食材データをファイルで保存したり、もらったファイルを読み込んで共有できます。</p>
-      
-      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <button type="button" onclick="exportBackupData()" style="flex: 1; min-width: 140px; background: #2196F3; color: white; border: none; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer;">📤 データを書き出す</button>
+  <div class="container">
+    <!-- タブ1: 買い物リスト作成 -->
+    <div id="tab1" class="tab-content active">
+      <div id="menuSelectCard" class="card">
+        <h2>献立・食材を選んでリスト作成</h2>
+        <p class="subtitle">作りたい献立や足りない食材を選んでください</p>
         
-        <label style="flex: 1; min-width: 140px; background: #4CAF50; color: white; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; display: inline-block;">
-          📥 データを読み込む
-          <input type="file" id="importFile" accept=".json,.txt" onchange="importBackupData(event)" style="display: none;">
-        </label>
+        <div class="sub-tab-bar" style="display: flex; margin-bottom: 15px; border-bottom: 2px solid #ddd;">
+          <button type="button" id="subTabMenuBtn" class="sub-tab-btn active" onclick="switchSubTab('menu')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; border-bottom: 3px solid #4CAF50; color: #4CAF50;">献立から選ぶ</button>
+          <button type="button" id="subTabIngBtn" class="sub-tab-btn" onclick="switchSubTab('ing')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; color: #666;">食材一覧から選ぶ</button>
+        </div>
+
+        <div id="subTabMenuContent" class="sub-tab-content" style="display: block;">
+          <div id="menuList" class="select-list"></div>
+        </div>
+
+        <div id="subTabIngContent" class="sub-tab-content" style="display: none;">
+          <div id="selectIngList" class="select-list"></div>
+        </div>
+
+        <div id="selectedItemsSummary" class="selected-summary-box" style="margin-top: 15px; background: #f0f7f4; border: 1px solid #c8e6c9; border-radius: 6px; padding: 12px;">
+          <p class="summary-empty">選択中の項目はありません</p>
+        </div>
+
+        <button type="button" onclick="generateShoppingList()" class="primary-btn" style="margin-top: 15px;">お買い物リストを作成する</button>
+      </div>
+
+      <div id="shoppingListCard" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h2 style="margin: 0;">お買い物リスト</h2>
+          <button type="button" onclick="backToMenuSelect()" style="background: #78909c; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">← 選択画面に戻る</button>
+        </div>
+        <p class="subtitle">タップでグレーアウト / 長押しで数量変更や削除</p>
+        
+        <div class="summary-box" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
+            <span>カゴの中 (購入済み):</span>
+            <span><strong><span id="purchasedPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="purchasedTax">0</span>円)</span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
+            <span>残り (未購入):</span>
+            <span><strong><span id="remainingPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="remainingTax">0</span>円)</span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold; color: #2e7d32; border-top: 1px solid #eee; padding-top: 6px; margin-top: 6px;">
+            <span>合計金額:</span>
+            <span><span id="totalPrice">0</span>円 <span style="font-size:0.8em; font-weight:normal; color:#555;">(税込 <span id="totalTax">0</span>円)</span></span>
+          </div>
+        </div>
+
+        <ul id="shoppingList" class="shopping-list"></ul>
+
+        <button type="button" onclick="sendToStock()" class="primary-btn" style="background: #2196F3; margin-top: 15px;">📦 在庫に追加</button>
+      </div>
+    </div>
+
+    <!-- タブ2: 食材登録 -->
+    <div id="tab2" class="tab-content">
+      <div class="card">
+        <h2>新しい食材の登録</h2>
+        <p class="subtitle">よく使う食材や単体をあらかじめ登録しておけます</p>
+        <div class="edit-row">
+          <input type="text" id="masterIngName" placeholder="食材名 (例: 豚肉)" style="width: 55%; margin: 0;">
+          <input type="number" id="masterIngPrice" placeholder="価格 (円)" style="width: 45%; margin: 0;">
+        </div>
+        <button type="button" onclick="saveMasterIngredient()" class="primary-btn" style="margin-top: 8px;">食材を登録する</button>
+      </div>
+
+      <div class="card">
+        <h2>🥦 食材の一括登録</h2>
+        <p class="subtitle">「食材名 価格」のリストをまとめて貼り付けて登録できます。</p>
+        <textarea id="bulkIngInput" placeholder="例：&#13;&#10;にんじん 120&#13;&#10;玉ねぎ 100" style="width: 100%; height: 80px; padding: 8px; margin-bottom: 8px; box-sizing: border-box;"></textarea>
+        <button type="button" onclick="saveBulkIngredients()" class="primary-btn" style="background: #2e7d32;">まとめて登録する</button>
+      </div>
+
+      <div class="card">
+        <h2>登録済み食材一覧</h2>
+        <div id="masterIngList"></div>
+      </div>
+
+      <div class="card" style="background: #f9f9f9; border: 1px dashed #ccc;">
+        <h3>💾 データ共有・バックアップ</h3>
+        <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">データをファイルで書き出したり、読み込んで共有できます。</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" onclick="exportBackupData()" style="flex: 1; background: #2196F3; color: white; border: none; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer;">📤 データを書き出す</button>
+          <label style="flex: 1; background: #4CAF50; color: white; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; display: inline-block;">
+            📥 データを読み込む
+            <input type="file" id="importFile" accept=".json,.txt" onchange="importBackupData(event)" style="display: none;">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- タブ3: 献立登録 -->
+    <div id="tab3" class="tab-content">
+      <div class="card">
+        <h2>献立の登録</h2>
+        <p class="subtitle">献立名と、必要な材料・価格を入力してください</p>
+        <label>献立名</label>
+        <input type="text" id="menuName" placeholder="例: カレーライス">
+        
+        <label style="margin-top: 10px; display: block;">材料と価格</label>
+        <div id="ingredientInputs"></div>
+        
+        <button type="button" onclick="addIngredientRow()" class="secondary-btn" style="margin-top: 5px;">＋ 材料入力行を追加</button>
+        <button type="button" onclick="saveMenu()" class="primary-btn" style="margin-top: 15px;">献立を保存する</button>
+      </div>
+
+      <div class="card">
+        <h2>登録済み献立の管理</h2>
+        <p class="subtitle">項目を長押しすると、その下にコピーが作成されます</p>
+        <div id="manageMenuList"></div>
+      </div>
+    </div>
+
+    <!-- タブ4: 在庫管理 -->
+    <div id="tab4" class="tab-content">
+      <div class="card">
+        <h2>🥦 食材在庫リスト</h2>
+        <p class="subtitle">買い物リストから追加された食材の在庫状況を確認できます</p>
+        <div id="stockListContainer"></div>
+      </div>
+    </div>
+
+    <!-- タブ5: 予定・履歴 -->
+    <div id="tab5" class="tab-content">
+      <div class="card">
+        <h2>📅 今週の献立スケジュール</h2>
+        <p class="subtitle">タップで完了/未完了の切り替え、長押しでコピーされます</p>
+        <div id="currentScheduleList"></div>
+        <div class="footer-actions">
+          <span style="font-size: 0.75rem; color: #666;">空欄からは登録済みの献立を追加できます</span>
+          <button class="btn-danger" onclick="removeCompletedSchedules()">完了分を削除</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📜 食べた記録（履歴）</h2>
+        <p class="subtitle">項目を長押しすると履歴を個別に削除できます</p>
+        <div id="historyListContainer"></div>
+        <div class="footer-actions" style="justify-content: flex-end; margin-top: 12px;">
+          <button class="btn-danger" onclick="clearHistory()">履歴をリセット</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- タブ3: 献立登録 -->
-  <div id="tab3" class="tab-content">
-    <div class="card">
-      <h2>献立の登録</h2>
-      <p class="subtitle">献立名と、必要な材料・価格を入力してください</p>
-      <label>献立名</label>
-      <input type="text" id="menuName" placeholder="例: カレーライス">
+  <!-- 買い物リスト編集用ポップアウト（モーダル） -->
+  <div id="shoppingEditModal" class="modal-overlay" onclick="closeShoppingModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3 id="modalItemName">食材名</h3>
+      <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">数量の変更またはリストからの削除を行います</p>
       
-      <label style="margin-top: 10px; display: block;">材料と価格</label>
-      <div id="ingredientInputs"></div>
-      
-      <button type="button" onclick="addIngredientRow()" class="secondary-btn" style="margin-top: 5px;">＋ 材料入力行を追加</button>
-      <button type="button" onclick="saveMenu()" class="primary-btn" style="margin-top: 15px;">献立を保存する</button>
-    </div>
+      <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 20px;">
+        <button type="button" class="qty-btn" style="width: 36px; height: 36px; font-size: 1.2rem;" onclick="modalChangeQty(-1)">-</button>
+        <span id="modalItemQty" class="qty-num" style="font-size: 1.2rem; min-width: 30px;">1</span>
+        <button type="button" class="qty-btn" style="width: 36px; height: 36px; font-size: 1.2rem;" onclick="modalChangeQty(1)">+</button>
+      </div>
 
-    <div class="card">
-      <h2>登録済み献立の管理</h2>
-      <div id="manageMenuList"></div>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="secondary-btn" style="flex: 1;" onclick="closeShoppingModal()">閉じる</button>
+        <button type="button" class="btn-danger" style="flex: 1; padding: 8px; border-radius: 4px;" onclick="modalDeleteShoppingItem()">リストから削除</button>
+      </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    let masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+    let menus = JSON.parse(localStorage.getItem('menus')) || [];
+    let shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+    let stockList = JSON.parse(localStorage.getItem('stockList')) || [];
+    let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
+    let historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+    let pendingSchedules = JSON.parse(localStorage.getItem('pendingSchedules')) || [];
+
+    let editingShoppingIndex = null;
+    let unitPrices = {};
+
+    const daysList = ['月', '火', '水', '木', '金', '土', '日', '未定'];
+    const timesList = ['朝', '昼', '夜', '間食'];
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      document.getElementById('tabBtn' + tabId.replace('tab', '')).classList.add('active');
+
+      if (tabId === 'tab1') {
+        renderMenuSelect();
+        renderSelectIngredients();
+      } else if (tabId === 'tab2') {
+        renderMasterIngredients();
+      } else if (tabId === 'tab3') {
+        renderManageMenus();
+      } else if (tabId === 'tab4') {
+        renderStock();
+      } else if (tabId === 'tab5') {
+        renderSchedule();
+        renderHistory();
+      }
+    }
+
+    function switchSubTab(sub) {
+      const isMenu = sub === 'menu';
+      document.getElementById('subTabMenuContent').style.display = isMenu ? 'block' : 'none';
+      document.getElementById('subTabIngContent').style.display = isMenu ? 'none' : 'block';
+      document.getElementById('subTabMenuBtn').style.borderBottom = isMenu ? '3px solid #4CAF50' : 'none';
+      document.getElementById('subTabMenuBtn').style.color = isMenu ? '#4CAF50' : '#666';
+      document.getElementById('subTabIngBtn').style.borderBottom = !isMenu ? '3px solid #4CAF50' : 'none';
+      document.getElementById('subTabIngBtn').style.color = !isMenu ? '#4CAF50' : '#666';
+    }
+
+    function renderMenuSelect() {
+      const container = document.getElementById('menuList');
+      if (menus.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center;">登録されている献立がありません。「献立」タブから登録してください。</p>';
+        return;
+      }
+      container.innerHTML = menus.map((menu, mIdx) => `
+        <div class="select-item">
+          <label style="cursor:pointer; display:flex; align-items:center; flex:1; margin:0;">
+            <input type="checkbox" class="menu-checkbox" value="${mIdx}" onchange="toggleQtyControls(this, 'menu-qty-${mIdx}')" style="width:auto; margin-right:8px;">
+            <span style="font-weight:500;">${menu.name}</span>
+            <span style="font-size:0.8rem; color:#666; margin-left:6px;">(${menu.ingredients.length}品)</span>
+          </label>
+          <div id="menu-qty-${mIdx}" class="qty-controls" style="display:none;">
+            <button type="button" class="qty-btn" onclick="changeQty('menu-qty-num-${mIdx}', -1)">-</button>
+            <span id="menu-qty-num-${mIdx}" class="qty-num">1</span>
+            <button type="button" class="qty-btn" onclick="changeQty('menu-qty-num-${mIdx}', 1)">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderSelectIngredients() {
+      const container = document.getElementById('selectIngList');
+      if (masterIngredients.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center;">登録されている食材がありません。「食材登録」タブから登録してください。</p>';
+        return;
+      }
+      container.innerHTML = masterIngredients.map((ing, iIdx) => `
+        <div class="select-item">
+          <label style="cursor:pointer; display:flex; align-items:center; flex:1; margin:0;">
+            <input type="checkbox" class="ing-checkbox" value="${iIdx}" onchange="toggleQtyControls(this, 'ing-qty-${iIdx}')" style="width:auto; margin-right:8px;">
+            <span style="font-weight:500;">${ing.name}</span>
+            <span style="font-size:0.85rem; color:#2e7d32; font-weight:bold; margin-left:6px;">${ing.price ? ing.price + '円' : ''}</span>
+          </label>
+          <div id="ing-qty-${iIdx}" class="qty-controls" style="display:none;">
+            <button type="button" class="qty-btn" onclick="changeQty('ing-qty-num-${iIdx}', -1)">-</button>
+            <span id="ing-qty-num-${iIdx}" class="qty-num">1</span>
+            <button type="button" class="qty-btn" onclick="changeQty('ing-qty-num-${iIdx}', 1)">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleQtyControls(checkbox, controlId) {
+      const controlBox = document.getElementById(controlId);
+      if (checkbox.checked) {
+        controlBox.style.display = 'flex';
+      } else {
+        controlBox.style.display = 'none';
+      }
+      updateSummary();
+    }
+
+    function changeQty(numId, amount) {
+      const numSpan = document.getElementById(numId);
+      let current = parseInt(numSpan.textContent) || 1;
+      current += amount;
+      if (current < 1) current = 1;
+      numSpan.textContent = current;
+      updateSummary();
+    }
+
+    function updateSummary() {
+      const summaryBox = document.getElementById('selectedItemsSummary');
+      const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
+      const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
+
+      if (checkedMenus.length === 0 && checkedIngs.length === 0) {
+        summaryBox.innerHTML = '<p class="summary-empty" style="margin:0; color:#666; font-size:0.9rem;">選択中の項目はありません</p>';
+        return;
+      }
+
+      let html = '<strong style="font-size:0.9rem; color:#2e7d32;">選択中:</strong><ul style="margin:4px 0 0 20px; padding:0; font-size:0.9rem;">';
+      
+      checkedMenus.forEach(el => {
+        const m = menus[el.value];
+        const qty = document.getElementById(`menu-qty-num-${el.value}`).textContent;
+        html += `<li>献立: ${m.name} × ${qty}</li>`;
+      });
+      
+      checkedIngs.forEach(el => {
+        const i = masterIngredients[el.value];
+        const qty = document.getElementById(`ing-qty-num-${el.value}`).textContent;
+        html += `<li>食材: ${i.name} (${i.price || 0}円) × ${qty}</li>`;
+      });
+
+      html += '</ul>';
+      summaryBox.innerHTML = html;
+    }
+
+    function generateShoppingList() {
+      const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
+      const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
+
+      let rawItems = [];
+      let newSchedules = [];
+      
+      checkedMenus.forEach(el => {
+        const m = menus[el.value];
+        const qty = parseInt(document.getElementById(`menu-qty-num-${el.value}`).textContent) || 1;
+        
+        for (let q = 0; q < qty; q++) {
+          newSchedules.push({ name: m.name, day: '月', time: '夜', completed: false });
+        }
+
+        for (let q = 0; q < qty; q++) {
+          m.ingredients.forEach(i => {
+            rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
+          });
+        }
+      });
+
+      checkedIngs.forEach(el => {
+        const i = masterIngredients[el.value];
+        const qty = parseInt(document.getElementById(`ing-qty-num-${el.value}`).textContent) || 1;
+        for (let q = 0; q < qty; q++) {
+          rawItems.push({ name: i.name, price: i.price ? Number(i.price) : 0 });
+        }
+      });
+
+      if (rawItems.length === 0 && newSchedules.length === 0) {
+        alert('アイテムが選択されていません。');
+        return;
+      }
+
+      let map = {};
+      unitPrices = {};
+
+      rawItems.forEach(item => {
+        if (!map[item.name]) {
+          map[item.name] = { name: item.name, totalPrice: 0, qty: 0, completed: false };
+          unitPrices[item.name] = item.price > 0 ? item.price : 0;
+        } else {
+          if (item.price > 0 && unitPrices[item.name] === 0) {
+            unitPrices[item.name] = item.price;
+          }
+        }
+        map[item.name].qty += 1;
+      });
+
+      Object.keys(map).forEach(name => {
+        map[name].totalPrice = unitPrices[name] * map[name].qty;
+      });
+
+      shoppingList = Object.values(map);
+      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+      localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+
+      pendingSchedules = newSchedules;
+      localStorage.setItem('pendingSchedules', JSON.stringify(pendingSchedules));
+      
+      document.getElementById('menuSelectCard').style.display = 'none';
+      document.getElementById('shoppingListCard').style.display = 'block';
+      renderShoppingListView();
+    }
+
+    function backToMenuSelect() {
+      document.getElementById('shoppingListCard').style.display = 'none';
+      document.getElementById('menuSelectCard').style.display = 'block';
+    }
+
+    function renderShoppingListView() {
+      unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+      const container = document.getElementById('shoppingList');
+      
+      container.innerHTML = shoppingList.map((item, idx) => `
+        <li class="list-item shopping-item ${item.completed ? 'completed' : ''}" data-index="${idx}" style="cursor:pointer; user-select:none;">
+          <div style="font-weight:500;">
+            ${item.name} 
+            <span style="font-size:0.85rem; color:#666; margin-left:6px;">(×${item.qty})</span>
+          </div>
+          <span style="color:#2e7d32; font-weight:bold;">${item.totalPrice.toLocaleString()}円</span>
+        </li>
+      `).join('');
+
+      document.querySelectorAll('.shopping-item').forEach(item => {
+        let timer = null;
+        let isLongPress = false;
+        const idx = parseInt(item.getAttribute('data-index'));
+
+        const startLongPress = (e) => {
+          isLongPress = false;
+          timer = setTimeout(() => {
+            isLongPress = true;
+            openShoppingModal(idx);
+          }, 600);
+        };
+
+        const cancelLongPress = () => {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
+        item.addEventListener('mousedown', startLongPress);
+        item.addEventListener('mouseup', (e) => {
+          cancelLongPress();
+          if (!isLongPress) toggleShoppingItem(idx);
+        });
+        item.addEventListener('mouseleave', cancelLongPress);
+
+        item.addEventListener('touchstart', startLongPress, { passive: true });
+        item.addEventListener('touchend', (e) => {
+          cancelLongPress();
+          if (!isLongPress) toggleShoppingItem(idx);
+        });
+        item.addEventListener('touchcancel', cancelLongPress);
+      });
+
+      let total = 0, purchased = 0;
+      shoppingList.forEach(i => {
+        const p = i.totalPrice || 0;
+        total += p;
+        if (i.completed) purchased += p;
+      });
+      const remaining = total - purchased;
+
+      document.getElementById('totalPrice').textContent = total.toLocaleString();
+      document.getElementById('totalTax').textContent = Math.floor(total * 1.1).toLocaleString();
+      document.getElementById('purchasedPrice').textContent = purchased.toLocaleString();
+      document.getElementById('purchasedTax').textContent = Math.floor(purchased * 1.1).toLocaleString();
+      document.getElementById('remainingPrice').textContent = remaining.toLocaleString();
+      document.getElementById('remainingTax').textContent = Math.floor(remaining * 1.1).toLocaleString();
+    }
+
+    function toggleShoppingItem(idx) {
+      shoppingList[idx].completed = !shoppingList[idx].completed;
+      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+      renderShoppingListView();
+    }
+
+    function openShoppingModal(idx) {
+      editingShoppingIndex = idx;
+      const item = shoppingList[idx];
+      document.getElementById('modalItemName').textContent = item.name;
+      document.getElementById('modalItemQty').textContent = item.qty;
+      document.getElementById('shoppingEditModal').style.display = 'flex';
+      
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function closeShoppingModal() {
+      document.getElementById('shoppingEditModal').style.display = 'none';
+      editingShoppingIndex = null;
+    }
+
+    function modalChangeQty(amount) {
+      if (editingShoppingIndex === null) return;
+      let item = shoppingList[editingShoppingIndex];
+      item.qty += amount;
+      if (item.qty < 1) item.qty = 1;
+
+      let unit = unitPrices[item.name] || (item.totalPrice / (item.qty - amount > 0 ? item.qty - amount : 1));
+      item.totalPrice = Math.round(unit * item.qty);
+
+      document.getElementById('modalItemQty').textContent = item.qty;
+      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+      renderShoppingListView();
+    }
+
+    function modalDeleteShoppingItem() {
+      if (editingShoppingIndex === null) return;
+      shoppingList.splice(editingShoppingIndex, 1);
+      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+      closeShoppingModal();
+      renderShoppingListView();
+    }
+
+    function sendToStock() {
+      if (shoppingList.length === 0) {
+        alert('買い物リストに項目がありません。');
+        return;
+      }
+
+      shoppingList.forEach(item => {
+        let existing = stockList.find(s => s.name === item.name);
+        if (existing) {
+          existing.qty += item.qty;
+        } else {
+          stockList.push({ name: item.name, qty: item.qty });
+        }
+      });
+
+      localStorage.setItem('stockList', JSON.stringify(stockList));
+
+      if (pendingSchedules && pendingSchedules.length > 0) {
+        currentSchedules = currentSchedules.concat(pendingSchedules);
+        localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+        pendingSchedules = [];
+        localStorage.setItem('pendingSchedules', JSON.stringify(pendingSchedules));
+      }
+
+      alert('買い物リストのアイテムを在庫に追加し、今週のスケジュールに献立を入れました！');
+      switchTab('tab4');
+    }
+
+    function renderStock() {
+      const container = document.getElementById('stockListContainer');
+      if (stockList.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center; padding:20px 0;">現在、在庫はありません。<br>「買い物」タブから在庫に追加してください。</p>';
+        return;
+      }
+      container.innerHTML = stockList.map((item, idx) => `
+        <div class="list-item">
+          <span style="font-weight:500;">${item.name}</span>
+          <div class="qty-controls">
+            <button type="button" class="qty-btn" onclick="updateStockQty(${idx}, -1)">-</button>
+            <span class="qty-num">${item.qty}</span>
+            <button type="button" class="qty-btn" onclick="updateStockQty(${idx}, 1)">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateStockQty(idx, amount) {
+      stockList[idx].qty += amount;
+      if (stockList[idx].qty < 0) stockList[idx].qty = 0;
+      localStorage.setItem('stockList', JSON.stringify(stockList));
+      renderStock();
+    }
+
+    function saveMasterIngredient() {
+      const name = document.getElementById('masterIngName').value.trim();
+      const price = document.getElementById('masterIngPrice').value.trim();
+      if (!name) { alert('食材名を入力してください'); return; }
+      masterIngredients.push({ name, price: price ? Number(price) : null });
+      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      document.getElementById('masterIngName').value = '';
+      document.getElementById('masterIngPrice').value = '';
+      renderMasterIngredients();
+    }
+
+    function saveBulkIngredients() {
+      const text = document.getElementById('bulkIngInput').value.trim();
+      if (!text) { alert('テキストを入力してください'); return; }
+      text.split('\n').forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length > 0 && parts[0]) {
+          const name = parts[0];
+          const price = parts[1] && !isNaN(parts[1]) ? Number(parts[1]) : null;
+          masterIngredients.push({ name, price });
+        }
+      });
+      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      document.getElementById('bulkIngInput').value = '';
+      renderMasterIngredients();
+      alert('一括登録しました！');
+    }
+
+    function renderMasterIngredients() {
+      const container = document.getElementById('masterIngList');
+      if (masterIngredients.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center;">登録食材はありません。</p>';
+        return;
+      }
+      container.innerHTML = masterIngredients.map((ing, idx) => `
+        <div class="list-item">
+          <span>${ing.name} <strong style="color:#2e7d32;">${ing.price ? ing.price + '円' : ''}</strong></span>
+          <button class="btn-del-sm" onclick="deleteMasterIng(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function deleteMasterIng(idx) {
+      masterIngredients.splice(idx, 1);
+      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      renderMasterIngredients();
+    }
+
+    function exportBackupData() {
+      const data = { masterIngredients, menus, shoppingList, stockList, currentSchedules, historyRecords, pendingSchedules, unitPrices };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kondate_backup.json';
+      a.click();
+    }
+
+    function importBackupData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.masterIngredients) masterIngredients = data.masterIngredients;
+          if (data.menus) menus = data.menus;
+          if (data.shoppingList) shoppingList = data.shoppingList;
+          if (data.stockList) stockList = data.stockList;
+          if (data.currentSchedules) currentSchedules = data.currentSchedules;
+          if (data.historyRecords) historyRecords = data.historyRecords;
+          if (data.pendingSchedules) pendingSchedules = data.pendingSchedules;
+          if (data.unitPrices) unitPrices = data.unitPrices;
+          
+          localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+          localStorage.setItem('menus', JSON.stringify(menus));
+          localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+          localStorage.setItem('stockList', JSON.stringify(stockList));
+          localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+          localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+          localStorage.setItem('pendingSchedules', JSON.stringify(pendingSchedules));
+          localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+          
+          alert('データを正常に読み込みました！');
+          switchTab('tab1');
+        } catch(err) {
+          alert('ファイルの読み込みに失敗しました。');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function initIngredientInputs() {
+      const container = document.getElementById('ingredientInputs');
+      container.innerHTML = `
+        <div class="edit-row">
+          <input type="text" placeholder="材料名" class="row-ing-name" style="width:55%; margin:0;">
+          <input type="number" placeholder="価格" class="row-ing-price" style="width:45%; margin:0;">
+        </div>
+      `;
+    }
+    initIngredientInputs();
+
+    function addIngredientRow() {
+      const container = document.getElementById('ingredientInputs');
+      const div = document.createElement('div');
+      div.className = 'edit-row';
+      div.style.marginTop = '6px';
+      div.innerHTML = `
+        <input type="text" placeholder="材料名" class="row-ing-name" style="width:55%; margin:0;">
+        <input type="number" placeholder="価格" class="row-ing-price" style="width:45%; margin:0;">
+      `;
+      container.appendChild(div);
+    }
+
+    function saveMenu() {
+      const name = document.getElementById('menuName').value.trim();
+      if (!name) { alert('献立名を入力してください'); return; }
+      
+      const names = document.querySelectorAll('.row-ing-name');
+      const prices = document.querySelectorAll('.row-ing-price');
+      let ingredients = [];
+      for (let i = 0; i < names.length; i++) {
+        if (names[i].value.trim()) {
+          ingredients.push({
+            name: names[i].value.trim(),
+            price: prices[i].value.trim() ? Number(prices[i].value.trim()) : null
+          });
+        }
+      }
+
+      menus.push({ name, ingredients });
+      localStorage.setItem('menus', JSON.stringify(menus));
+      document.getElementById('menuName').value = '';
+      initIngredientInputs();
+      renderManageMenus();
+      alert('献立を保存しました！');
+    }
+
+    function renderManageMenus() {
+      const container = document.getElementById('manageMenuList');
+      if (menus.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center;">登録されている献立はありません。</p>';
+        return;
+      }
+      container.innerHTML = menus.map((menu, idx) => `
+        <div class="list-item menu-manage-item" data-index="${idx}" style="align-items:flex-start; cursor:pointer; user-select:none;" title="長押しするとコピーを作成します">
+          <div>
+            <strong>${menu.name}</strong>
+            <div style="font-size:0.8rem; color:#666;">材料: ${menu.ingredients.map(i => i.name).join(', ')}</div>
+          </div>
+          <button class="btn-del-sm" onclick="event.stopPropagation(); deleteMenu(${idx})">✕</button>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.menu-manage-item').forEach(item => {
+        let timer = null;
+        const idx = parseInt(item.getAttribute('data-index'));
+
+        const startLongPress = (e) => {
+          if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+          timer = setTimeout(() => {
+            duplicateMenu(idx);
+          }, 600);
+        };
+
+        const cancelLongPress = () => {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
+        item.addEventListener('mousedown', startLongPress);
+        item.addEventListener('mouseup', cancelLongPress);
+        item.addEventListener('mouseleave', cancelLongPress);
+
+        item.addEventListener('touchstart', startLongPress, { passive: true });
+        item.addEventListener('touchend', cancelLongPress);
+        item.addEventListener('touchcancel', cancelLongPress);
+      });
+    }
+
+    function duplicateMenu(idx) {
+      const target = menus[idx];
+      if (!target) return;
+
+      const duplicated = JSON.parse(JSON.stringify(target));
+      duplicated.name = target.name + 'のコピー';
+
+      menus.splice(idx + 1, 0, duplicated);
+      localStorage.setItem('menus', JSON.stringify(menus));
+      renderManageMenus();
+      
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function deleteMenu(idx) {
+      menus.splice(idx, 1);
+      localStorage.setItem('menus', JSON.stringify(menus));
+      renderManageMenus();
+    }
+
+    function updateScheduleField(index, field, value) {
+      if (currentSchedules[index]) {
+        currentSchedules[index][field] = value;
+        localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      }
+    }
+
+    function removeScheduleItem(index) {
+      currentSchedules.splice(index, 1);
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      renderSchedule();
+    }
+
+    function removeCompletedSchedules() {
+      currentSchedules = currentSchedules.filter(item => !item.completed);
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      renderSchedule();
+    }
+
+    function toggleCompleteSchedule(index) {
+      const item = currentSchedules[index];
+      if (!item) return;
+
+      const matchedMenu = menus.find(m => m.name === item.name);
+
+      if (!item.completed) {
+        // 未完了 ➔ 完了（グレーアウト）＆在庫引き落とし ＆ 履歴追加
+        item.completed = true;
+
+        if (matchedMenu && matchedMenu.ingredients) {
+          matchedMenu.ingredients.forEach(ing => {
+            let stockItem = stockList.find(s => s.name === ing.name);
+            if (stockItem) {
+              stockItem.qty -= 1;
+              if (stockItem.qty < 0) stockItem.qty = 0;
+            }
+          });
+          localStorage.setItem('stockList', JSON.stringify(stockList));
+        }
+
+        const now = new Date();
+        historyRecords.unshift({
+          id: Date.now() + Math.random(),
+          name: item.name,
+          day: item.day || '未定',
+          time: item.time || '夜',
+          date: `${now.getMonth() + 1}/${now.getDate()}`,
+          group: `${now.getFullYear()}年${now.getMonth() + 1}月 第${Math.ceil(now.getDate() / 7)}週`
+        });
+        localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+
+      } else {
+        // 完了 ➔ 未完了に戻す ＆ 在庫を元に戻す ＆ 直近の該当履歴を削除
+        item.completed = false;
+
+        if (matchedMenu && matchedMenu.ingredients) {
+          matchedMenu.ingredients.forEach(ing => {
+            let stockItem = stockList.find(s => s.name === ing.name);
+            if (stockItem) {
+              stockItem.qty += 1;
+            }
+          });
+          localStorage.setItem('stockList', JSON.stringify(stockList));
+        }
+
+        // 履歴から一番新しい該当レコードを削除
+        const hIdx = historyRecords.findIndex(h => h.name === item.name && h.day === item.day && h.time === item.time);
+        if (hIdx !== -1) {
+          historyRecords.splice(hIdx, 1);
+          localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+        }
+      }
+
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      renderSchedule();
+      renderHistory();
+    }
+
+    function duplicateScheduleItem(idx) {
+      const target = currentSchedules[idx];
+      if (!target) return;
+
+      const duplicated = JSON.parse(JSON.stringify(target));
+      duplicated.completed = false; // コピー時は未完了に
+      currentSchedules.splice(idx + 1, 0, duplicated);
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      renderSchedule();
+
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function addScheduleFromBlank() {
+      const select = document.getElementById('blankMenuSelect');
+      const selectedIndex = select.value;
+      if (selectedIndex === "") return;
+
+      const menu = menus[selectedIndex];
+      if (!menu) return;
+
+      currentSchedules.push({
+        name: menu.name,
+        day: '月',
+        time: '夜',
+        completed: false
+      });
+
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      renderSchedule();
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('currentScheduleList');
+      
+      if (currentSchedules.length === 0) {
+        let menuOptions = menus.map((m, idx) => `<option value="${idx}">${m.name}</option>`).join('');
+        container.innerHTML = `
+          <div style="text-align:center; padding:15px 0;">
+            <p style="color:#888; margin-bottom:10px; font-size:0.9rem;">予定がありません。登録済みの献立から追加できます：</p>
+            <div style="display:flex; gap:8px; max-width:300px; margin:0 auto;">
+              <select id="blankMenuSelect" class="select-mini" style="flex:1; width:auto; padding:6px;">
+                <option value="">献立を選択...</option>
+                ${menuOptions}
+              </select>
+              <button type="button" onclick="addScheduleFromBlank()" class="primary-btn" style="width:auto; padding:6px 12px; font-size:0.85rem;">追加</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = currentSchedules.map((item, index) => {
+        const dayOptions = daysList.map(d => `<option value="${d}" ${item.day === d ? 'selected' : ''}>${d}</option>`).join('');
+        const timeOptions = timesList.map(t => `<option value="${t}" ${item.time === t ? 'selected' : ''}>${t}</option>`).join('');
+        return `
+          <div class="schedule-row-simple schedule-manage-item ${item.completed ? 'completed' : ''}" data-index="${index}" onclick="toggleCompleteSchedule(${index})" title="タップで完了/未完了切替 / 長押しでコピー">
+            <span style="font-weight:500;">${item.name}</span>
+            <div class="schedule-controls" onclick="event.stopPropagation()">
+              <select class="select-mini" onchange="updateScheduleField(${index}, 'day', this.value)">${dayOptions}</select>
+              <select class="select-mini" onchange="updateScheduleField(${index}, 'time', this.value)">${timeOptions}</select>
+              <button class="btn-del-sm" onclick="removeScheduleItem(${index})">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.schedule-manage-item').forEach(item => {
+        let timer = null;
+        const idx = parseInt(item.getAttribute('data-index'));
+
+        const startLongPress = (e) => {
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.closest('button') || e.target.closest('select')) return;
+          timer = setTimeout(() => {
+            duplicateScheduleItem(idx);
+          }, 600);
+        };
+
+        const cancelLongPress = () => {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
+        item.addEventListener('mousedown', startLongPress);
+        item.addEventListener('mouseup', cancelLongPress);
+        item.addEventListener('mouseleave', cancelLongPress);
+
+        item.addEventListener('touchstart', startLongPress, { passive: true });
+        item.addEventListener('touchend', cancelLongPress);
+        item.addEventListener('touchcancel', cancelLongPress);
+      });
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyListContainer');
+      if (historyRecords.length === 0) {
+        container.innerHTML = '<p style="color:#888; text-align:center; padding:10px 0;">まだ食べた記録はありません。</p>';
+        return;
+      }
+
+      const grouped = {};
+      historyRecords.forEach((r, originalIdx) => {
+        const g = r.group || 'そのほか';
+        if (!grouped[g]) grouped[g] = [];
+        grouped[g].push({ ...r, originalIdx });
+      });
+
+      container.innerHTML = Object.keys(grouped).map(gName => `
+        <div class="accordion-group">
+          <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+            📂 ${gName} <span style="font-size:0.8rem; background:#fff; padding:2px 8px; border-radius:10px; color:#2e7d32;">${grouped[gName].length}件 ▼</span>
+          </div>
+          <div class="accordion-content open">
+            ${grouped[gName].map(item => `
+              <div class="history-row history-item" data-index="${item.originalIdx}" title="長押しするとこの記録を削除できます">
+                <span>${item.name} (<span style="color:#2e7d32;">${item.day}</span> <span style="color:#e65100;">${item.time}</span>)</span>
+                <span style="font-size:0.75rem; color:#888;">${item.date}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      // 履歴項目の長押し削除イベントの紐付け
+      document.querySelectorAll('.history-item').forEach(item => {
+        let timer = null;
+        const idx = parseInt(item.getAttribute('data-index'));
+
+        const startLongPress = () => {
+          timer = setTimeout(() => {
+            if (confirm(`「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
+              historyRecords.splice(idx, 1);
+              localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+              renderHistory();
+              if (navigator.vibrate) navigator.vibrate(50);
+            }
+          }, 600);
+        };
+
+        const cancelLongPress = () => {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
+        item.addEventListener('mousedown', startLongPress);
+        item.addEventListener('mouseup', cancelLongPress);
+        item.addEventListener('mouseleave', cancelLongPress);
+
+        item.addEventListener('touchstart', startLongPress, { passive: true });
+        item.addEventListener('touchend', cancelLongPress);
+        item.addEventListener('touchcancel', cancelLongPress);
+      });
+    }
+
+    function clearHistory() {
+      if (confirm('食べた記録をすべてリセットしますか？')) {
+        historyRecords = [];
+        localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+        renderHistory();
+      }
+    }
+
+    renderMenuSelect();
+    renderSelectIngredients();
+  </script>
 </body>
 </html>
