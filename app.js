@@ -28,30 +28,59 @@ let editingEatOutIndex = null;
 let editingMenuIndex = null;
 
 // ==========================================
-// 初期化処理（リロード対策）
+// 初期化処理（リロード対策を強化）
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-  masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
-  eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
-  menus = JSON.parse(localStorage.getItem('menus')) || [];
-  shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
-  stockList = JSON.parse(localStorage.getItem('stockList')) || [];
-  currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
-  historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
-  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
-
+window.addEventListener('DOMContentLoaded', () => {
+  loadAllDataFromStorage();
   initIngredientInputs();
   renderSchedule();
   renderHistory();
 });
 
+function loadAllDataFromStorage() {
+  try {
+    masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+    eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
+    menus = JSON.parse(localStorage.getItem('menus')) || [];
+    shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+    stockList = JSON.parse(localStorage.getItem('stockList')) || [];
+    currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+    historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+    unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+  } catch (e) {
+    console.error('LocalStorageの読み込みエラー:', e);
+  }
+}
+
+function saveAllDataToStorage() {
+  try {
+    localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+    localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+    localStorage.setItem('menus', JSON.stringify(menus));
+    localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+    localStorage.setItem('stockList', JSON.stringify(stockList));
+    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+    localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+    localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+  } catch (e) {
+    console.error('LocalStorageの保存エラー:', e);
+  }
+}
+
 function switchTab(tabId) {
+  loadAllDataFromStorage();
+  
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
-  document.getElementById(tabId).classList.add('active');
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) targetTab.classList.add('active');
+
   const btnMap = { tab1: 'tabBtn1', tab2: 'tabBtn2', tab5: 'tabBtn5', tab3: 'tabBtn3' };
-  if (btnMap[tabId]) document.getElementById(btnMap[tabId]).classList.add('active');
+  if (btnMap[tabId]) {
+    const btn = document.getElementById(btnMap[tabId]);
+    if (btn) btn.classList.add('active');
+  }
 
   if (tabId === 'tab1') {
     renderSchedule();
@@ -67,28 +96,35 @@ function switchTab(tabId) {
   }
 }
 
-// データベースタブ内のサブタブ切り替え用関数
+// データベースタブ内のサブタブ切り替え
 function switchDbSubTab(sub) {
   const isIng = sub === 'ing';
   const isMenu = sub === 'menu';
   const isEat = sub === 'eat';
 
-  document.getElementById('dbSubTabIngContent').style.display = isIng ? 'block' : 'none';
-  document.getElementById('dbSubTabMenuContent').style.display = isMenu ? 'block' : 'none';
-  document.getElementById('dbSubTabEatContent').style.display = isEat ? 'block' : 'none';
+  const ingContent = document.getElementById('dbSubTabIngContent');
+  const menuContent = document.getElementById('dbSubTabMenuContent');
+  const eatContent = document.getElementById('dbSubTabEatContent');
+  if (ingContent) ingContent.style.display = isIng ? 'block' : 'none';
+  if (menuContent) menuContent.style.display = isMenu ? 'block' : 'none';
+  if (eatContent) eatContent.style.display = isEat ? 'block' : 'none';
 
   const ingBtn = document.getElementById('dbSubTabIngBtn');
   const menuBtn = document.getElementById('dbSubTabMenuBtn');
   const eatBtn = document.getElementById('dbSubTabEatBtn');
 
   [ingBtn, menuBtn, eatBtn].forEach(btn => {
-    btn.style.background = '#f5f5f5';
-    btn.style.color = '#666';
+    if (btn) {
+      btn.style.background = '#f5f5f5';
+      btn.style.color = '#666';
+    }
   });
 
   const activeBtn = isIng ? ingBtn : (isMenu ? menuBtn : eatBtn);
-  activeBtn.style.background = '#4CAF50';
-  activeBtn.style.color = 'white';
+  if (activeBtn) {
+    activeBtn.style.background = '#4CAF50';
+    activeBtn.style.color = 'white';
+  }
 
   if (isIng) renderMasterIngredients();
   if (isMenu) renderManageMenus();
@@ -97,12 +133,21 @@ function switchDbSubTab(sub) {
 
 function switchSubTab(sub) {
   const isMenu = sub === 'menu';
-  document.getElementById('subTabMenuContent').style.display = isMenu ? 'block' : 'none';
-  document.getElementById('subTabIngContent').style.display = isMenu ? 'none' : 'block';
-  document.getElementById('subTabMenuBtn').style.borderBottom = isMenu ? '3px solid #4CAF50' : 'none';
-  document.getElementById('subTabMenuBtn').style.color = isMenu ? '#4CAF50' : '#666';
-  document.getElementById('subTabIngBtn').style.borderBottom = !isMenu ? '3px solid #4CAF50' : 'none';
-  document.getElementById('subTabIngBtn').style.color = !isMenu ? '#4CAF50' : '#666';
+  const menuCont = document.getElementById('subTabMenuContent');
+  const ingCont = document.getElementById('subTabIngContent');
+  const menuBtn = document.getElementById('subTabMenuBtn');
+  const ingBtn = document.getElementById('subTabIngBtn');
+
+  if (menuCont) menuCont.style.display = isMenu ? 'block' : 'none';
+  if (ingCont) ingCont.style.display = isMenu ? 'none' : 'block';
+  if (menuBtn) {
+    menuBtn.style.borderBottom = isMenu ? '3px solid #4CAF50' : 'none';
+    menuBtn.style.color = isMenu ? '#4CAF50' : '#666';
+  }
+  if (ingBtn) {
+    ingBtn.style.borderBottom = !isMenu ? '3px solid #4CAF50' : 'none';
+    ingBtn.style.color = !isMenu ? '#4CAF50' : '#666';
+  }
 }
 
 function renderMenuSelect() {
@@ -196,6 +241,7 @@ function updateSummary() {
 }
 
 function generateShoppingListFromSchedule() {
+  loadAllDataFromStorage();
   const scheduleRows = document.querySelectorAll('#currentScheduleTableBody tr');
   let rawItems = [];
 
@@ -249,13 +295,12 @@ function generateShoppingListFromSchedule() {
   });
 
   shoppingList = Object.values(map);
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
-  
+  saveAllDataToStorage();
   renderShoppingListView();
 }
 
 function addSelectedItemsToShoppingList() {
+  loadAllDataFromStorage();
   const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
   const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
   let rawItems = [];
@@ -296,9 +341,7 @@ function addSelectedItemsToShoppingList() {
     }
   });
 
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
-  
+  saveAllDataToStorage();
   backToShoppingMain();
 }
 
@@ -323,7 +366,7 @@ function backToShoppingMain() {
 }
 
 function renderShoppingListView() {
-  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+  loadAllDataFromStorage();
   const container = document.getElementById('shoppingList');
   if (!container) return;
   
@@ -378,9 +421,12 @@ function renderShoppingListView() {
 }
 
 function toggleShoppingItem(idx) {
-  shoppingList[idx].completed = !shoppingList[idx].completed;
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-  renderShoppingListView();
+  loadAllDataFromStorage();
+  if (shoppingList[idx]) {
+    shoppingList[idx].completed = !shoppingList[idx].completed;
+    saveAllDataToStorage();
+    renderShoppingListView();
+  }
 }
 
 function openShoppingModal(idx) {
@@ -403,7 +449,9 @@ function closeShoppingModal() {
 
 function modalChangeQty(amount) {
   if (editingShoppingIndex === null) return;
+  loadAllDataFromStorage();
   let item = shoppingList[editingShoppingIndex];
+  if (!item) return;
   item.qty += amount;
   if (item.qty < 1) item.qty = 1;
 
@@ -412,19 +460,21 @@ function modalChangeQty(amount) {
 
   const qtyEl = document.getElementById('modalItemQty');
   if (qtyEl) qtyEl.textContent = item.qty;
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  saveAllDataToStorage();
   renderShoppingListView();
 }
 
 function modalDeleteShoppingItem() {
   if (editingShoppingIndex === null) return;
+  loadAllDataFromStorage();
   shoppingList.splice(editingShoppingIndex, 1);
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+  saveAllDataToStorage();
   closeShoppingModal();
   renderShoppingListView();
 }
 
 function sendToStock() {
+  loadAllDataFromStorage();
   if (shoppingList.length === 0) { alert('買い物リストに項目がありません。'); return; }
   
   shoppingList.forEach(item => {
@@ -432,18 +482,17 @@ function sendToStock() {
     if (existing) { existing.qty += item.qty; } 
     else { stockList.push({ name: item.name, qty: item.qty }); }
   });
-  localStorage.setItem('stockList', JSON.stringify(stockList));
 
   shoppingList = [];
   unitPrices = {};
-  localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-  localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
+  saveAllDataToStorage();
 
   alert('買い物リストのアイテムを在庫に追加し、お買い物リストをリセットしました！');
   switchTab('tab5');
 }
 
 function renderStock() {
+  loadAllDataFromStorage();
   const container = document.getElementById('stockListContainer');
   if (!container) return;
   if (stockList.length === 0) {
@@ -472,13 +521,17 @@ function renderStock() {
 }
 
 function updateStockQty(idx, amount) {
-  stockList[idx].qty += amount;
-  if (stockList[idx].qty < 0) stockList[idx].qty = 0;
-  localStorage.setItem('stockList', JSON.stringify(stockList));
-  renderStock();
+  loadAllDataFromStorage();
+  if (stockList[idx]) {
+    stockList[idx].qty += amount;
+    if (stockList[idx].qty < 0) stockList[idx].qty = 0;
+    saveAllDataToStorage();
+    renderStock();
+  }
 }
 
 function saveMasterIngredient() {
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('masterIngName');
   const priceEl = document.getElementById('masterIngPrice');
   if (!nameEl) return;
@@ -486,13 +539,14 @@ function saveMasterIngredient() {
   const price = priceEl ? priceEl.value.trim() : '';
   if (!name) { alert('食材名を入力してください'); return; }
   masterIngredients.push({ name, price: price ? Number(price) : null });
-  localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+  saveAllDataToStorage();
   nameEl.value = '';
   if (priceEl) priceEl.value = '';
   renderMasterIngredients();
 }
 
 function saveBulkIngredients() {
+  loadAllDataFromStorage();
   const textEl = document.getElementById('bulkIngInput');
   if (!textEl) return;
   const text = textEl.value.trim();
@@ -505,13 +559,14 @@ function saveBulkIngredients() {
       masterIngredients.push({ name, price });
     }
   });
-  localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+  saveAllDataToStorage();
   textEl.value = '';
   renderMasterIngredients();
   alert('一括登録しました！');
 }
 
 function renderMasterIngredients() {
+  loadAllDataFromStorage();
   const container = document.getElementById('masterIngList');
   if (!container) return;
   if (masterIngredients.length === 0) {
@@ -560,28 +615,31 @@ function closeMasterIngModal() {
 
 function updateMasterIngredient() {
   if (editingMasterIndex === null) return;
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('editMasterName');
   const priceEl = document.getElementById('editMasterPrice');
   const name = nameEl ? nameEl.value.trim() : '';
   const price = priceEl ? priceEl.value.trim() : '';
   if (!name) { alert('食材名を入力してください'); return; }
   masterIngredients[editingMasterIndex] = { name, price: price ? Number(price) : null };
-  localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+  saveAllDataToStorage();
   closeMasterIngModal();
   renderMasterIngredients();
 }
 
 function deleteMasterIngredientFromModal() {
   if (editingMasterIndex === null) return;
+  loadAllDataFromStorage();
   if (confirm(`「${masterIngredients[editingMasterIndex].name}」を削除しますか？`)) {
     masterIngredients.splice(editingMasterIndex, 1);
-    localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+    saveAllDataToStorage();
     closeMasterIngModal();
     renderMasterIngredients();
   }
 }
 
 function saveEatOutStore() {
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('eatOutStoreName');
   const priceEl = document.getElementById('eatOutStorePrice');
   if (!nameEl) return;
@@ -589,13 +647,14 @@ function saveEatOutStore() {
   const price = priceEl ? priceEl.value.trim() : '';
   if (!name) { alert('店舗名を入力してください'); return; }
   eatOutStores.push({ name, price: price ? Number(price) : null });
-  localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+  saveAllDataToStorage();
   nameEl.value = '';
   if (priceEl) priceEl.value = '';
   renderEatOutStores();
 }
 
 function renderEatOutStores() {
+  loadAllDataFromStorage();
   const container = document.getElementById('eatOutStoreList');
   if (!container) return;
   if (eatOutStores.length === 0) {
@@ -644,28 +703,31 @@ function closeEatOutStoreModal() {
 
 function updateEatOutStore() {
   if (editingEatOutIndex === null) return;
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('editEatOutStoreName');
   const priceEl = document.getElementById('editEatOutStorePrice');
   const name = nameEl ? nameEl.value.trim() : '';
   const price = priceEl ? priceEl.value.trim() : '';
   if (!name) { alert('店舗名を入力してください'); return; }
   eatOutStores[editingEatOutIndex] = { name, price: price ? Number(price) : null };
-  localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+  saveAllDataToStorage();
   closeEatOutStoreModal();
   renderEatOutStores();
 }
 
 function deleteEatOutStoreFromModal() {
   if (editingEatOutIndex === null) return;
+  loadAllDataFromStorage();
   if (confirm(`「${eatOutStores[editingEatOutIndex].name}」を削除しますか？`)) {
     eatOutStores.splice(editingEatOutIndex, 1);
-    localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+    saveAllDataToStorage();
     closeEatOutStoreModal();
     renderEatOutStores();
   }
 }
 
 function exportBackupData() {
+  loadAllDataFromStorage();
   const data = { masterIngredients, eatOutStores, menus, shoppingList, stockList, currentSchedules, historyRecords, unitPrices };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -689,15 +751,7 @@ function importBackupData(event) {
       if (data.historyRecords) historyRecords = data.historyRecords;
       if (data.unitPrices) unitPrices = data.unitPrices;
       
-      localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-      localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
-      localStorage.setItem('menus', JSON.stringify(menus));
-      localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-      localStorage.setItem('stockList', JSON.stringify(stockList));
-      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-      localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
-      localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
-      
+      saveAllDataToStorage();
       alert('データを正常に読み込みました！');
       switchTab('tab1');
     } catch(err) { alert('ファイルの読み込みに失敗しました。'); }
@@ -729,6 +783,7 @@ function addIngredientRow() {
 }
 
 function saveMenu() {
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('menuName');
   if (!nameEl) return;
   const name = nameEl.value.trim();
@@ -742,7 +797,7 @@ function saveMenu() {
     }
   }
   menus.push({ name, ingredients });
-  localStorage.setItem('menus', JSON.stringify(menus));
+  saveAllDataToStorage();
   nameEl.value = '';
   initIngredientInputs();
   renderManageMenus();
@@ -750,6 +805,7 @@ function saveMenu() {
 }
 
 function renderManageMenus() {
+  loadAllDataFromStorage();
   const container = document.getElementById('manageMenuList');
   if (!container) return;
   if (menus.length === 0) {
@@ -825,6 +881,7 @@ function addEditIngredientRow() {
 
 function updateMenu() {
   if (editingMenuIndex === null) return;
+  loadAllDataFromStorage();
   const nameEl = document.getElementById('editMenuName');
   const name = nameEl ? nameEl.value.trim() : '';
   if (!name) { alert('献立名を入力してください'); return; }
@@ -837,27 +894,29 @@ function updateMenu() {
     }
   }
   menus[editingMenuIndex] = { name, ingredients };
-  localStorage.setItem('menus', JSON.stringify(menus));
+  saveAllDataToStorage();
   closeMenuModal();
   renderManageMenus();
 }
 
 function duplicateMenuFromModal() {
   if (editingMenuIndex === null) return;
+  loadAllDataFromStorage();
   const target = menus[editingMenuIndex];
   const duplicated = JSON.parse(JSON.stringify(target));
   duplicated.name = target.name + 'のコピー';
   menus.splice(editingMenuIndex + 1, 0, duplicated);
-  localStorage.setItem('menus', JSON.stringify(menus));
+  saveAllDataToStorage();
   closeMenuModal();
   renderManageMenus();
 }
 
 function deleteMenuFromModal() {
   if (editingMenuIndex === null) return;
+  loadAllDataFromStorage();
   if (confirm(`「${menus[editingMenuIndex].name}」を削除しますか？`)) {
     menus.splice(editingMenuIndex, 1);
-    localStorage.setItem('menus', JSON.stringify(menus));
+    saveAllDataToStorage();
     closeMenuModal();
     renderManageMenus();
   }
@@ -884,6 +943,7 @@ function getMenuPrice(menuName) {
 }
 
 function renderSchedule() {
+  loadAllDataFromStorage();
   const container = document.getElementById('currentScheduleTableBody');
   if (!container) return;
   let totalScheduleSum = 0;
@@ -936,19 +996,19 @@ function renderSchedule() {
 }
 
 function toggleSchedulePrice(day, time) {
+  loadAllDataFromStorage();
   const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) return;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].excludePrice = !currentSchedules[keyStr].excludePrice;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-  
+  saveAllDataToStorage();
   renderSchedule();
 }
 
 function resetAllSchedules() {
   if (confirm('今週のスケジュール（入力内容やチェック状態）をすべてリセットしますか？この操作は元に戻せません。')) {
-    localStorage.removeItem('currentSchedules');
     currentSchedules = {};
+    saveAllDataToStorage();
     renderSchedule();
   }
 }
@@ -975,12 +1035,7 @@ function onScheduleInput(day, time, index) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   currentSchedules[keyStr].name = val;
   
-  // 即座に確実にストレージへ保存
-  try {
-    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-  } catch(e) {
-    console.error('保存エラー', e);
-  }
+  saveAllDataToStorage();
 
   if (isEatOutItem(val.trim())) {
     inputEl.classList.add('is-eatout');
@@ -1051,11 +1106,12 @@ function selectSuggest(day, time, index, menuName) {
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
   currentSchedules[keyStr].name = menuName;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  saveAllDataToStorage();
   renderSchedule();
 }
 
 function toggleCompleteSchedule(day, time, index) {
+  loadAllDataFromStorage();
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
   const item = currentSchedules[keyStr];
@@ -1070,7 +1126,6 @@ function toggleCompleteSchedule(day, time, index) {
         let stockItem = stockList.find(s => s.name === ing.name);
         if (stockItem) { stockItem.qty -= 1; if (stockItem.qty < 0) stockItem.qty = 0; }
       });
-      localStorage.setItem('stockList', JSON.stringify(stockList));
     }
 
     const now = new Date();
@@ -1082,7 +1137,6 @@ function toggleCompleteSchedule(day, time, index) {
       date: `${now.getMonth() + 1}/${now.getDate()}`,
       group: `${now.getFullYear()}年${now.getMonth() + 1}月 第${Math.ceil(now.getDate() / 7)}週`
     });
-    localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
   } else {
     item.completed = false;
     if (matchedMenu && matchedMenu.ingredients) {
@@ -1090,22 +1144,21 @@ function toggleCompleteSchedule(day, time, index) {
         let stockItem = stockList.find(s => s.name === ing.name);
         if (stockItem) { stockItem.qty += 1; }
       });
-      localStorage.setItem('stockList', JSON.stringify(stockList));
     }
 
     const hIdx = historyRecords.findIndex(h => h.name === item.name && h.day === day && h.time === time);
     if (hIdx !== -1) {
       historyRecords.splice(hIdx, 1);
-      localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
     }
   }
 
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  saveAllDataToStorage();
   renderSchedule();
   renderHistory();
 }
 
 function renderHistory() {
+  loadAllDataFromStorage();
   const container = document.getElementById('historyListContainer');
   if (!container) return;
   if (historyRecords.length === 0) {
@@ -1141,9 +1194,10 @@ function renderHistory() {
     const idx = parseInt(item.getAttribute('data-index'));
     const startLongPress = () => {
       timer = setTimeout(() => {
+        loadAllDataFromStorage();
         if (confirm(`「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
           historyRecords.splice(idx, 1);
-          localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+          saveAllDataToStorage();
           renderHistory();
           if (navigator.vibrate) navigator.vibrate(50);
         }
@@ -1161,6 +1215,7 @@ function renderHistory() {
 }
 
 function exportHistoryTxt() {
+  loadAllDataFromStorage();
   if (historyRecords.length === 0) { alert('出力する履歴がありません。'); return; }
   let textContent = '【 食べた記録（履歴） 】\n\n';
   const grouped = {};
@@ -1185,7 +1240,7 @@ function exportHistoryTxt() {
 function clearHistory() {
   if (confirm('食べた記録をすべてリセットしますか？')) {
     historyRecords = [];
-    localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
+    saveAllDataToStorage();
     renderHistory();
   }
 }
@@ -1193,7 +1248,7 @@ function clearHistory() {
 function resetAllStock() {
   if (confirm('在庫リストをすべて削除してまっすぐにしますか？')) {
     stockList = [];
-    localStorage.setItem('stockList', JSON.stringify(stockList));
+    saveAllDataToStorage();
     renderStock();
   }
 }
