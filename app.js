@@ -40,14 +40,12 @@ function switchTab(tabId) {
     renderMenuSelect();
     renderSelectIngredients();
   } else if (tabId === 'tab3') {
-    // データベースタブを開いたときはデフォルトで食材サブタブを表示・描画
     switchDbSubTab('ing');
   } else if (tabId === 'tab5') {
     renderStock();
   }
 }
 
-// データベースタブ内のサブタブ切り替え用関数
 function switchDbSubTab(sub) {
   const isIng = sub === 'ing';
   const isMenu = sub === 'menu';
@@ -175,9 +173,6 @@ function updateSummary() {
   summaryBox.innerHTML = html;
 }
 
-/**
- * 予定から読み込むボタンを押したとき実行される関数（完了メッセージのalertを削除済み）
- */
 function generateShoppingListFromSchedule() {
   const scheduleRows = document.querySelectorAll('#currentScheduleTableBody tr');
   let rawItems = [];
@@ -236,7 +231,6 @@ function generateShoppingListFromSchedule() {
   localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
   
   renderShoppingListView();
-  // ご要望に基づき、完了時の alert メッセージを削除しました。
 }
 
 function addSelectedItemsToShoppingList() {
@@ -863,6 +857,7 @@ function renderSchedule() {
 
   container.innerHTML = fixedScheduleKeys.map((keyObj, index) => {
     const keyStr = `${keyObj.day}_${keyObj.time}`;
+    // localStorage から確実に最新データを復元
     const data = currentSchedules[keyStr] || { name: '', completed: false, excludePrice: false };
     
     const basePrice = getMenuPrice(data.name);
@@ -888,7 +883,7 @@ function renderSchedule() {
         <td style="font-weight: bold; color: ${dayColor};">${keyObj.day}(${keyObj.time})</td>
         <td>
           <div class="schedule-input-container">
-            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${data.name || ''}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
+            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
             <div class="suggest-box" id="suggest-box-${index}" onmousedown="event.preventDefault()"></div>
           </div>
         </td>
@@ -910,7 +905,7 @@ function renderSchedule() {
 
 function toggleSchedulePrice(day, time) {
   const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) return;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].excludePrice = !currentSchedules[keyStr].excludePrice;
   localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
@@ -946,6 +941,8 @@ function onScheduleInput(day, time, index) {
 
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
+  
+  // 入力値を確実に保存する
   currentSchedules[keyStr].name = inputEl.value;
   localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
 
@@ -1015,7 +1012,7 @@ function selectSuggest(day, time, index, menuName) {
   if (box) box.style.display = 'none';
 
   const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   currentSchedules[keyStr].name = menuName;
   localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
   renderSchedule();
@@ -1023,7 +1020,7 @@ function selectSuggest(day, time, index, menuName) {
 
 function toggleCompleteSchedule(day, time, index) {
   const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false };
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   const item = currentSchedules[keyStr];
   if (!item.name || item.name.trim() === '') return;
 
