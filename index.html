@@ -50,6 +50,9 @@
     <!-- 買い物リストカード（初期状態は非表示） -->
     <section class="card highlight" id="shoppingListCard" style="display: none;">
       <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 選ぶ画面に戻る</button>
+      <button type="button" onclick="exportMenuTxt()" style="background:#2196F3; color:white; border:none; border-radius:6px; padding:10px 16px; font-weight:bold; cursor:pointer; margin-left:8px;">
+  📄 献立・食材をtxt出力</button>
+</button>
       
       <!-- 金額サマリーエリア -->
       <div class="price-summary">
@@ -107,6 +110,13 @@
       <div id="manageMenuList"></div>
     </section>
   </div>
+
+  <!-- stock.htmlへの移動リンク -->
+<div style="margin-bottom: 16px;">
+  <a href="stock.html" style="display: inline-block; background-color: #2e7d32; color: white; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.9rem;">
+    📅 献立スケジュール＆在庫管理へ ➔
+  </a>
+</div>
 
   <script src="app.js"></script>
 </body>

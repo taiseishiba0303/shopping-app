@@ -590,3 +590,57 @@ addIngredientRow();
 renderMenus();
 renderSelectableIngredients();
 updateSelectionSummary();
+
+// 選択された「献立」と「追加食材」をtxtファイルとしてダウンロード
+function exportMenuTxt() {
+  const { selectedMenus, selectedIngs } = getSelectedItemsData();
+
+  if (selectedMenus.length === 0 && selectedIngs.length === 0) {
+    return alert('出力する献立または食材がありません');
+  }
+
+  let textContent = "=== 買い物・献立リスト ===\n\n";
+
+  // 1. 選択された献立と材料を出力
+  if (selectedMenus.length > 0) {
+    textContent += "【献立】\n";
+    selectedMenus.forEach(item => {
+      const menu = menus.find(m => m.id === item.id);
+      if (menu) {
+        const countText = item.qty > 1 ? ` (×${item.qty})` : '';
+        textContent += `■ ${menu.name}${countText}\n`;
+        menu.ingredients.forEach(ing => {
+          textContent += `  ・${ing.name} (${ing.price || 0}円)\n`;
+        });
+        textContent += "\n";
+      }
+    });
+  }
+
+  // 2. 単品で選択された食材があれば出力
+  if (selectedIngs.length > 0) {
+    textContent += "【単品追加の食材】\n";
+    selectedIngs.forEach(item => {
+      const ing = masterIngredients[item.index];
+      if (ing) {
+        const countText = item.qty > 1 ? ` (×${item.qty})` : '';
+        textContent += `  ・${ing.name}${countText} (${ing.price || 0}円)\n`;
+      }
+    });
+    textContent += "\n";
+  }
+
+  // ファイルダウンロード処理
+  const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `menu_list_${today}.txt`;
+  
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

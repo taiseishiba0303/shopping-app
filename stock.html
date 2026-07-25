@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📅 献立 ＆ 食材在庫管理</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 16px;
+      color: #333;
+    }
+    .container { max-width: 500px; margin: 0 auto; }
+    
+    .nav-link {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: #2e7d32;
+      font-weight: bold;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    
+    h1 { font-size: 1.3rem; text-align: center; color: #2e7d32; margin-bottom: 12px; }
+    
+    /* タブバー */
+    .tab-bar {
+      display: flex;
+      background: #e0e0e0;
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 4px;
+      border: none;
+      background: transparent;
+      font-weight: bold;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #666;
+      text-align: center;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: #2e7d32;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    input[type="file"] { display: none; }
+    .custom-file-btn {
+      display: block;
+      background: #4CAF50;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* 1行ごとの献立スケジュールカード */
+    .menu-schedule-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .menu-schedule-row:active {
+      background-color: #f0f0f0;
+    }
+
+    .menu-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    .menu-name {
+      font-weight: bold;
+      font-size: 1rem;
+      color: #333;
+    }
+    .menu-schedule-tag {
+      font-size: 0.85rem;
+      color: #2e7d32;
+      background-color: #e8f5e9;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .status-badge {
+      font-size: 0.8rem;
+      font-weight: bold;
+      padding: 6px 10px;
+      border-radius: 20px;
+    }
+    .status-badge.uncooked {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+    .status-badge.cooked {
+      background-color: #e0e0e0;
+      color: #616161;
+    }
+
+    /* 調理済み（食べた）状態のグレーアウト */
+    .menu-schedule-row.is-cooked {
+      background-color: #f5f5f5;
+      border-color: #eee;
+      opacity: 0.6;
+    }
+    .menu-schedule-row.is-cooked .menu-name {
+      text-decoration: line-through;
+      color: #888;
+    }
+
+    /* 食材在庫リスト表示 */
+    .stock-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .stock-item.empty {
+      background: #f5f5f5;
+      opacity: 0.5;
+    }
+    .stock-name {
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+    .stock-item.empty .stock-name {
+      text-decoration: line-through;
+    }
+    .qty-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-qty {
+      background: #e0e0e0;
+      border: none;
+      border-radius: 4px;
+      width: 28px;
+      height: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .clear-btn {
+      background: #e0e0e0;
+      color: #333;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <a href="index.html" class="nav-link">🛒 買い物リストへ戻る ➔</a>
+
+  <h1>📅 献立 ＆ 食材在庫管理</h1>
+
+  <!-- タブボタン -->
+  <div class="tab-bar">
+    <button id="tabBtn1" class="tab-btn active" onclick="switchTab('schedule')">🍱 食べる予定・献立</button>
+    <button id="tabBtn2" class="tab-btn" onclick="switchTab('stock')">🥬 購入済み食材</button>
+  </div>
+
+  <!-- txt読み込みエリア -->
+  <div class="card">
+    <label class="custom-file-btn">
+      📄 献立・食材リスト(.txt)を取り込む
+      <input type="file" id="txtFileInput" accept=".txt" onchange="importTxtFile(event)">
+    </label>
+  </div>
+
+  <!-- タブ①：献立スケジュール（1行ずつ表示） -->
+  <div id="tabContentSchedule" class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h2 style="font-size: 1.1rem; margin: 0;">📋 献立予定一覧</h2>
+      <span id="menuCount" style="font-size: 0.85rem; color: #666;">0件</span>
+    </div>
+
+    <div id="menuScheduleList"></div>
+    <button type="button" class="clear-btn" onclick="clearAllData()">全データをクリア</button>
+  </div>
+
+  <!-- タブ②：購入済み食材一覧 -->
+  <div id="tabContentStock" class="card" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h2 style="font-size: 1.1rem; margin: 0;">🥬 食材在庫リスト</h2>
+      <span id="stockCount" style="font-size: 0.85rem; color: #666;">0種類</span>
+    </div>
+
+    <div id="stockList"></div>
+    <button type="button" class="clear-btn" onclick="clearAllData()">全データをクリア</button>
+  </div>
+</div>
+
+<script>
+  let scheduleItems = JSON.parse(localStorage.getItem('scheduleItems')) || [];
+  let stockIngredients = JSON.parse(localStorage.getItem('stockIngredients')) || {};
+
+  function saveData() {
+    localStorage.setItem('scheduleItems', JSON.stringify(scheduleItems));
+    localStorage.setItem('stockIngredients', JSON.stringify(stockIngredients));
+    renderSchedule();
+    renderStock();
+  }
+
+  // タブ切り替え処理
+  function switchTab(tabName) {
+    const isSchedule = tabName === 'schedule';
+    document.getElementById('tabContentSchedule').style.display = isSchedule ? 'block' : 'none';
+    document.getElementById('tabContentStock').style.display = isSchedule ? 'none' : 'block';
+    
+    document.getElementById('tabBtn1').classList.toggle('active', isSchedule);
+    document.getElementById('tabBtn2').classList.toggle('active', !isSchedule);
+  }
+
+  // txt取り込み処理
+  function importTxtFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      const lines = text.split('\n');
+
+      let currentMenu = null;
+      let addedCount = 0;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        
+        if (trimmed.startsWith('■')) {
+          if (currentMenu) {
+            scheduleItems.push(currentMenu);
+            addedCount++;
+          }
+          currentMenu = {
+            id: Date.now() + Math.random(),
+            name: trimmed.replace('■', '').replace(/\(×\d+\)/, '').trim(),
+            schedules: [{ day: '月', time: '昼', eaten: false }], // デフォルト予定
+            ingredients: []
+          };
+        } 
+        else if (trimmed.startsWith('・') && currentMenu) {
+          const ingName = trimmed.replace('・', '').split('(')[0].trim();
+          currentMenu.ingredients.push(ingName);
+          
+          if (stockIngredients[ingName] === undefined) {
+            stockIngredients[ingName] = 1;
+          }
+        }
+      });
+
+      if (currentMenu) {
+        scheduleItems.push(currentMenu);
+        addedCount++;
+      }
+
+      saveData();
+      alert(`${addedCount} 件の献立を取り込みました！`);
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  // 1. 献立タブの描画（1行ずつ表示）
+  function renderSchedule() {
+    const container = document.getElementById('menuScheduleList');
+    const countEl = document.getElementById('menuCount');
+    container.innerHTML = '';
+
+    let totalScheduleCount = 0;
+
+    if (scheduleItems.length === 0) {
+      container.innerHTML = '<p style="color: #888; text-align: center;">献立はありません</p>';
+      countEl.textContent = '0件';
+      return;
+    }
+
+    scheduleItems.forEach((menu, menuIndex) => {
+      const schedules = (menu.schedules && menu.schedules.length > 0)
+        ? menu.schedules
+        : [{ day: '未定', time: '', eaten: false }];
+
+      schedules.forEach((sch, schIndex) => {
+        totalScheduleCount++;
+        const row = document.createElement('div');
+        const isEaten = sch.eaten || false;
+
+        row.className = `menu-schedule-row ${isEaten ? 'is-cooked' : ''}`;
+        
+        // 行全体をタップした時の「食べた / 未調理」切り替え
+        row.onclick = () => toggleEat(menuIndex, schIndex);
+
+        const timeText = sch.time ? ` ${sch.time}` : '';
+        const scheduleTag = `${sch.day}${timeText}`;
+
+        row.innerHTML = `
+          <div class="menu-info">
+            <span class="menu-name">${menu.name}</span>
+            <span class="menu-schedule-tag">${scheduleTag}</span>
+          </div>
+          <div>
+            <span class="status-badge ${isEaten ? 'cooked' : 'uncooked'}">
+              ${isEaten ? '✓ 食べた' : '未調理'}
+            </span>
+          </div>
+        `;
+
+        container.appendChild(row);
+      });
+    });
+
+    countEl.textContent = `${totalScheduleCount}件`;
+  }
+
+  // 2. 食材在庫タブの描画
+  function renderStock() {
+    const container = document.getElementById('stockList');
+    const countEl = document.getElementById('stockCount');
+    const keys = Object.keys(stockIngredients);
+    container.innerHTML = '';
+    countEl.textContent = `${keys.length}種類`;
+
+    if (keys.length === 0) {
+      container.innerHTML = '<p style="color: #888; text-align: center;">食材はありません</p>';
+      return;
+    }
+
+    keys.forEach(ingName => {
+      const qty = stockIngredients[ingName];
+      const div = document.createElement('div');
+      div.className = `stock-item ${qty === 0 ? 'empty' : ''}`;
+
+      div.innerHTML = `
+        <span class="stock-name">${ingName}</span>
+        <div class="qty-control">
+          <button class="btn-qty" onclick="changeStockQty('${ingName}', -1)">-</button>
+          <span style="font-weight:bold; min-width:30px; text-align:center;">${qty}</span>
+          <button class="btn-qty" onclick="changeStockQty('${ingName}', 1)">+</button>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  // 行タップ時の「食べた！」切り替え ＆ 食材在庫連動処理
+  function toggleEat(menuIndex, schIndex) {
+    const menu = scheduleItems[menuIndex];
+    if (!menu) return;
+
+    if (!menu.schedules || menu.schedules.length === 0) {
+      menu.schedules = [{ day: '未定', time: '', eaten: false }];
+    }
+
+    const sch = menu.schedules[schIndex];
+    sch.eaten = !sch.eaten; // 反転
+
+    // 献立に含まれる食材の在庫を「-1」または「+1」減減算
+    if (menu.ingredients && menu.ingredients.length > 0) {
+      menu.ingredients.forEach(ingName => {
+        if (stockIngredients[ingName] !== undefined) {
+          if (sch.eaten) {
+            stockIngredients[ingName] = Math.max(0, stockIngredients[ingName] - 1);
+          } else {
+            stockIngredients[ingName] += 1;
+          }
+        }
+      });
+    }
+
+    saveData();
+  }
+
+  function changeStockQty(ingName, delta) {
+    if (stockIngredients[ingName] !== undefined) {
+      stockIngredients[ingName] = Math.max(0, stockIngredients[ingName] + delta);
+      saveData();
+    }
+  }
+
+  function clearAllData() {
+    if (confirm('すべてのデータ（献立・食材在庫）を初期化しますか？')) {
+      scheduleItems = [];
+      stockIngredients = {};
+      saveData();
+    }
+  }
+
+  renderSchedule();
+  renderStock();
+</script>
+
+</body>
+</html>
