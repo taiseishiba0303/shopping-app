@@ -1,3 +1,6 @@
+// ==========================================
+// アプリケーション全体の状態管理
+// ==========================================
 let masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
 let eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
 let menus = JSON.parse(localStorage.getItem('menus')) || [];
@@ -24,6 +27,24 @@ let editingMasterIndex = null;
 let editingEatOutIndex = null;
 let editingMenuIndex = null;
 
+// ==========================================
+// 初期化処理（リロード対策）
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+  masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+  eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
+  menus = JSON.parse(localStorage.getItem('menus')) || [];
+  shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+  stockList = JSON.parse(localStorage.getItem('stockList')) || [];
+  currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+  historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+
+  initIngredientInputs();
+  renderSchedule();
+  renderHistory();
+});
+
 function switchTab(tabId) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -40,7 +61,6 @@ function switchTab(tabId) {
     renderMenuSelect();
     renderSelectIngredients();
   } else if (tabId === 'tab3') {
-    // データベースタブを開いたときはデフォルトで食材サブタブを表示・描画
     switchDbSubTab('ing');
   } else if (tabId === 'tab5') {
     renderStock();
@@ -175,9 +195,6 @@ function updateSummary() {
   summaryBox.innerHTML = html;
 }
 
-/**
- * 予定から読み込むボタンを押したとき実行される関数（完了メッセージのalertを削除済み）
- */
 function generateShoppingListFromSchedule() {
   const scheduleRows = document.querySelectorAll('#currentScheduleTableBody tr');
   let rawItems = [];
@@ -236,7 +253,6 @@ function generateShoppingListFromSchedule() {
   localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
   
   renderShoppingListView();
-  // ご要望に基づき、完了時の alert メッセージを削除しました。
 }
 
 function addSelectedItemsToShoppingList() {
@@ -535,11 +551,13 @@ function openMasterIngModal(idx) {
   if (modalEl) modalEl.style.display = 'flex';
   if (navigator.vibrate) navigator.vibrate(50);
 }
+
 function closeMasterIngModal() {
   const modalEl = document.getElementById('masterIngEditModal');
   if (modalEl) modalEl.style.display = 'none';
   editingMasterIndex = null;
 }
+
 function updateMasterIngredient() {
   if (editingMasterIndex === null) return;
   const nameEl = document.getElementById('editMasterName');
@@ -552,6 +570,7 @@ function updateMasterIngredient() {
   closeMasterIngModal();
   renderMasterIngredients();
 }
+
 function deleteMasterIngredientFromModal() {
   if (editingMasterIndex === null) return;
   if (confirm(`「${masterIngredients[editingMasterIndex].name}」を削除しますか？`)) {
@@ -616,11 +635,13 @@ function openEatOutStoreModal(idx) {
   if (modalEl) modalEl.style.display = 'flex';
   if (navigator.vibrate) navigator.vibrate(50);
 }
+
 function closeEatOutStoreModal() {
   const modalEl = document.getElementById('eatOutStoreEditModal');
   if (modalEl) modalEl.style.display = 'none';
   editingEatOutIndex = null;
 }
+
 function updateEatOutStore() {
   if (editingEatOutIndex === null) return;
   const nameEl = document.getElementById('editEatOutStoreName');
@@ -633,6 +654,7 @@ function updateEatOutStore() {
   closeEatOutStoreModal();
   renderEatOutStores();
 }
+
 function deleteEatOutStoreFromModal() {
   if (editingEatOutIndex === null) return;
   if (confirm(`「${eatOutStores[editingEatOutIndex].name}」を削除しますか？`)) {
@@ -782,11 +804,13 @@ function openMenuModal(idx) {
   if (modalEl) modalEl.style.display = 'flex';
   if (navigator.vibrate) navigator.vibrate(50);
 }
+
 function closeMenuModal() {
   const modalEl = document.getElementById('menuEditModal');
   if (modalEl) modalEl.style.display = 'none';
   editingMenuIndex = null;
 }
+
 function addEditIngredientRow() {
   const container = document.getElementById('editIngredientInputs');
   if (!container) return;
@@ -798,6 +822,7 @@ function addEditIngredientRow() {
   `;
   container.appendChild(div);
 }
+
 function updateMenu() {
   if (editingMenuIndex === null) return;
   const nameEl = document.getElementById('editMenuName');
@@ -816,6 +841,7 @@ function updateMenu() {
   closeMenuModal();
   renderManageMenus();
 }
+
 function duplicateMenuFromModal() {
   if (editingMenuIndex === null) return;
   const target = menus[editingMenuIndex];
@@ -826,6 +852,7 @@ function duplicateMenuFromModal() {
   closeMenuModal();
   renderManageMenus();
 }
+
 function deleteMenuFromModal() {
   if (editingMenuIndex === null) return;
   if (confirm(`「${menus[editingMenuIndex].name}」を削除しますか？`)) {
@@ -888,7 +915,7 @@ function renderSchedule() {
         <td style="font-weight: bold; color: ${dayColor};">${keyObj.day}(${keyObj.time})</td>
         <td>
           <div class="schedule-input-container">
-            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${data.name || ''}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
+            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${data.name || ''}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onblur="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
             <div class="suggest-box" id="suggest-box-${index}" onmousedown="event.preventDefault()"></div>
           </div>
         </td>
@@ -942,14 +969,20 @@ function onScheduleInput(day, time, index) {
   const inputEl = document.getElementById(`sched-input-${index}`);
   const suggestBox = document.getElementById(`suggest-box-${index}`);
   if (!inputEl) return;
-  const val = inputEl.value.trim();
+  const val = inputEl.value;
 
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
-  currentSchedules[keyStr].name = inputEl.value;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  currentSchedules[keyStr].name = val;
+  
+  // 即座に確実にストレージへ保存
+  try {
+    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  } catch(e) {
+    console.error('保存エラー', e);
+  }
 
-  if (isEatOutItem(inputEl.value)) {
+  if (isEatOutItem(val.trim())) {
     inputEl.classList.add('is-eatout');
   } else {
     inputEl.classList.remove('is-eatout');
@@ -969,7 +1002,7 @@ function onScheduleInput(day, time, index) {
   }
   
   const priceCell = document.querySelector(`#sched-row-${index} td:nth-child(3)`);
-  const currentPrice = getMenuPrice(inputEl.value);
+  const currentPrice = getMenuPrice(val.trim());
   const isExcluded = currentSchedules[keyStr].excludePrice;
   
   if (priceCell) {
@@ -985,20 +1018,21 @@ function onScheduleInput(day, time, index) {
   }
 
   if (!suggestBox) return;
+  const trimmedVal = val.trim();
   let candidates = [];
   menus.forEach(m => candidates.push(m.name));
   eatOutStores.forEach(s => candidates.push(s.name));
 
-  const normalizedVal = toHiragana(val).toLowerCase();
+  const normalizedVal = toHiragana(trimmedVal).toLowerCase();
 
-  const matches = val === '' 
+  const matches = trimmedVal === '' 
     ? candidates 
     : candidates.filter(name => {
         const normalizedName = toHiragana(name).toLowerCase();
         return normalizedName.includes(normalizedVal);
       });
 
-  if (matches.length > 0) {
+  if (matches.length > 0 && trimmedVal !== '') {
     suggestBox.innerHTML = matches.map(name => `
       <div class="suggest-item" onclick="selectSuggest('${day}', '${time}', ${index}, '${name.replace(/'/g, "\\'")}')">${name}</div>
     `).join('');
@@ -1155,21 +1189,6 @@ function clearHistory() {
     renderHistory();
   }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
-  eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
-  menus = JSON.parse(localStorage.getItem('menus')) || [];
-  shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
-  stockList = JSON.parse(localStorage.getItem('stockList')) || [];
-  currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
-  historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
-  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
-
-  initIngredientInputs();
-  renderSchedule();
-  renderHistory();
-});
 
 function resetAllStock() {
   if (confirm('在庫リストをすべて削除してまっすぐにしますか？')) {
