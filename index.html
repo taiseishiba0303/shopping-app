@@ -12,6 +12,14 @@
       color: #333;
       margin: 0;
       padding: 0;
+      /* ページ全体でテキスト選択を不必要に防ぐ */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    /* 入力欄など文字入力をしたい場所だけ選択・入力を許可する */
+    input, textarea, select {
+      -webkit-user-select: text;
+      user-select: text;
     }
     .container {
       max-width: 600px;
@@ -106,6 +114,13 @@
       color: #888;
       text-decoration: line-through;
     }
+    
+    /* 在庫0のときのスタイル */
+    .stock-item.empty {
+      background: #f1f3f4;
+      color: #888;
+    }
+
     .qty-controls {
       display: flex;
       align-items: center;
@@ -142,7 +157,6 @@
       margin-bottom: 8px;
       background: #fff;
       cursor: pointer;
-      user-select: none;
     }
     .schedule-row-simple.completed {
       background: #f1f3f4;
@@ -172,7 +186,7 @@
     }
     .accordion-content { display: none; padding: 10px 14px; background: #fff; border-top: 1px solid #e0e0e0; }
     .accordion-content.open { display: block; }
-    .history-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 0.9rem; cursor: pointer; user-select: none; }
+    .history-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 0.9rem; cursor: pointer; }
     .footer-actions { display: flex; justify-content: space-between; margin-top: 12px; gap: 8px; }
     .btn-danger { background: #d32f2f; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold; width: auto; }
 
@@ -259,7 +273,7 @@
 
         <ul id="shoppingList" class="shopping-list"></ul>
 
-        <button type="button" onclick="sendToStock()" class="primary-btn" style="background: #2196F3; margin-top: 15px;">📦 在庫に追加</button>
+        <button type="button" onclick="sendToStock()" class="primary-btn" style="background: #2196F3; margin-top: 15px;">在庫に追加</button>
       </div>
     </div>
 
@@ -284,6 +298,7 @@
 
       <div class="card">
         <h2>登録済み食材一覧</h2>
+        <p class="subtitle" style="margin-bottom: 8px;">項目を長押しすると編集・削除ができます</p>
         <div id="masterIngList"></div>
       </div>
 
@@ -326,7 +341,7 @@
     <div id="tab4" class="tab-content">
       <div class="card">
         <h2>🥦 食材在庫リスト</h2>
-        <p class="subtitle">買い物リストから追加された食材の在庫状況を確認できます</p>
+        <p class="subtitle">在庫があるものが上に、0のものが下に表示されます</p>
         <div id="stockListContainer"></div>
       </div>
     </div>
@@ -373,6 +388,26 @@
     </div>
   </div>
 
+  <!-- 登録食材編集用ポップアウト（モーダル） -->
+  <div id="masterIngEditModal" class="modal-overlay" onclick="closeMasterIngModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3>食材の編集</h3>
+      <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">名前や価格の変更、または削除が行えます</p>
+      
+      <label style="text-align:left; display:block; font-size:0.85rem; font-weight:bold; margin-bottom:2px;">食材名</label>
+      <input type="text" id="editMasterName" placeholder="食材名" style="margin-bottom: 10px;">
+      
+      <label style="text-align:left; display:block; font-size:0.85rem; font-weight:bold; margin-bottom:2px;">価格 (円)</label>
+      <input type="number" id="editMasterPrice" placeholder="価格" style="margin-bottom: 15px;">
+
+      <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+        <button type="button" class="primary-btn" style="flex: 1;" onclick="updateMasterIngredient()">保存する</button>
+        <button type="button" class="secondary-btn" style="flex: 1;" onclick="closeMasterIngModal()">キャンセル</button>
+      </div>
+      <button type="button" class="btn-danger" style="width: 100%; padding: 8px; border-radius: 4px; font-size: 0.9rem;" onclick="deleteMasterIngredientFromModal()">この食材を削除する</button>
+    </div>
+  </div>
+
   <script>
     let masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
     let menus = JSON.parse(localStorage.getItem('menus')) || [];
@@ -383,6 +418,7 @@
     let pendingSchedules = JSON.parse(localStorage.getItem('pendingSchedules')) || [];
 
     let editingShoppingIndex = null;
+    let editingMasterIndex = null;
     let unitPrices = {};
 
     const daysList = ['月', '火', '水', '木', '金', '土', '日', '未定'];
@@ -587,7 +623,7 @@
       const container = document.getElementById('shoppingList');
       
       container.innerHTML = shoppingList.map((item, idx) => `
-        <li class="list-item shopping-item ${item.completed ? 'completed' : ''}" data-index="${idx}" style="cursor:pointer; user-select:none;">
+        <li class="list-item shopping-item ${item.completed ? 'completed' : ''}" data-index="${idx}">
           <div style="font-weight:500;">
             ${item.name} 
             <span style="font-size:0.85rem; color:#666; margin-left:6px;">(×${item.qty})</span>
@@ -601,7 +637,7 @@
         let isLongPress = false;
         const idx = parseInt(item.getAttribute('data-index'));
 
-        const startLongPress = (e) => {
+        const startLongPress = () => {
           isLongPress = false;
           timer = setTimeout(() => {
             isLongPress = true;
@@ -617,14 +653,14 @@
         };
 
         item.addEventListener('mousedown', startLongPress);
-        item.addEventListener('mouseup', (e) => {
+        item.addEventListener('mouseup', () => {
           cancelLongPress();
           if (!isLongPress) toggleShoppingItem(idx);
         });
         item.addEventListener('mouseleave', cancelLongPress);
 
         item.addEventListener('touchstart', startLongPress, { passive: true });
-        item.addEventListener('touchend', (e) => {
+        item.addEventListener('touchend', () => {
           cancelLongPress();
           if (!isLongPress) toggleShoppingItem(idx);
         });
@@ -724,16 +760,26 @@
         container.innerHTML = '<p style="color:#888; text-align:center; padding:20px 0;">現在、在庫はありません。<br>「買い物」タブから在庫に追加してください。</p>';
         return;
       }
-      container.innerHTML = stockList.map((item, idx) => `
-        <div class="list-item">
-          <span style="font-weight:500;">${item.name}</span>
-          <div class="qty-controls">
-            <button type="button" class="qty-btn" onclick="updateStockQty(${idx}, -1)">-</button>
-            <span class="qty-num">${item.qty}</span>
-            <button type="button" class="qty-btn" onclick="updateStockQty(${idx}, 1)">+</button>
+
+      let sortedStock = stockList.map((item, originalIndex) => ({ ...item, originalIndex })).sort((a, b) => {
+        if (a.qty > 0 && b.qty === 0) return -1;
+        if (a.qty === 0 && b.qty > 0) return 1;
+        return 0;
+      });
+
+      container.innerHTML = sortedStock.map((item) => {
+        const isEmpty = item.qty === 0;
+        return `
+          <div class="list-item stock-item ${isEmpty ? 'empty' : ''}">
+            <span style="font-weight:500;">${item.name}</span>
+            <div class="qty-controls">
+              <button type="button" class="qty-btn" onclick="updateStockQty(${item.originalIndex}, -1)">-</button>
+              <span class="qty-num">${item.qty}</span>
+              <button type="button" class="qty-btn" onclick="updateStockQty(${item.originalIndex}, 1)">+</button>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function updateStockQty(idx, amount) {
@@ -778,17 +824,79 @@
         return;
       }
       container.innerHTML = masterIngredients.map((ing, idx) => `
-        <div class="list-item">
-          <span>${ing.name} <strong style="color:#2e7d32;">${ing.price ? ing.price + '円' : ''}</strong></span>
-          <button class="btn-del-sm" onclick="deleteMasterIng(${idx})">✕</button>
+        <div class="list-item master-ing-item" data-index="${idx}" title="長押しすると編集・削除ができます">
+          <span style="font-weight:500;">${ing.name}</span>
+          <span style="color:#2e7d32; font-weight:bold;">${ing.price ? ing.price + '円' : '価格未設定'}</span>
         </div>
       `).join('');
+
+      document.querySelectorAll('.master-ing-item').forEach(item => {
+        let timer = null;
+        const idx = parseInt(item.getAttribute('data-index'));
+
+        const startLongPress = () => {
+          timer = setTimeout(() => {
+            openMasterIngModal(idx);
+          }, 600);
+        };
+
+        const cancelLongPress = () => {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
+        item.addEventListener('mousedown', startLongPress);
+        item.addEventListener('mouseup', cancelLongPress);
+        item.addEventListener('mouseleave', cancelLongPress);
+
+        item.addEventListener('touchstart', startLongPress, { passive: true });
+        item.addEventListener('touchend', cancelLongPress);
+        item.addEventListener('touchcancel', cancelLongPress);
+      });
     }
 
-    function deleteMasterIng(idx) {
-      masterIngredients.splice(idx, 1);
+    function openMasterIngModal(idx) {
+      editingMasterIndex = idx;
+      const ing = masterIngredients[idx];
+      document.getElementById('editMasterName').value = ing.name;
+      document.getElementById('editMasterPrice').value = ing.price !== null ? ing.price : '';
+      document.getElementById('masterIngEditModal').style.display = 'flex';
+
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function closeMasterIngModal() {
+      document.getElementById('masterIngEditModal').style.display = 'none';
+      editingMasterIndex = null;
+    }
+
+    function updateMasterIngredient() {
+      if (editingMasterIndex === null) return;
+      const name = document.getElementById('editMasterName').value.trim();
+      const price = document.getElementById('editMasterPrice').value.trim();
+
+      if (!name) { alert('食材名を入力してください'); return; }
+
+      masterIngredients[editingMasterIndex] = {
+        name,
+        price: price ? Number(price) : null
+      };
+
       localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+      closeMasterIngModal();
       renderMasterIngredients();
+    }
+
+    function deleteMasterIngredientFromModal() {
+      if (editingMasterIndex === null) return;
+      if (confirm(`「${masterIngredients[editingMasterIndex].name}」を削除しますか？`)) {
+        masterIngredients.splice(editingMasterIndex, 1);
+        localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+        closeMasterIngModal();
+        renderMasterIngredients();
+      }
     }
 
     function exportBackupData() {
@@ -889,7 +997,7 @@
         return;
       }
       container.innerHTML = menus.map((menu, idx) => `
-        <div class="list-item menu-manage-item" data-index="${idx}" style="align-items:flex-start; cursor:pointer; user-select:none;" title="長押しするとコピーを作成します">
+        <div class="list-item menu-manage-item" data-index="${idx}" style="align-items:flex-start;" title="長押しするとコピーを作成します">
           <div>
             <strong>${menu.name}</strong>
             <div style="font-size:0.8rem; color:#666;">材料: ${menu.ingredients.map(i => i.name).join(', ')}</div>
@@ -972,7 +1080,6 @@
       const matchedMenu = menus.find(m => m.name === item.name);
 
       if (!item.completed) {
-        // 未完了 ➔ 完了（グレーアウト）＆在庫引き落とし ＆ 履歴追加
         item.completed = true;
 
         if (matchedMenu && matchedMenu.ingredients) {
@@ -998,7 +1105,6 @@
         localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
 
       } else {
-        // 完了 ➔ 未完了に戻す ＆ 在庫を元に戻す ＆ 直近の該当履歴を削除
         item.completed = false;
 
         if (matchedMenu && matchedMenu.ingredients) {
@@ -1011,7 +1117,6 @@
           localStorage.setItem('stockList', JSON.stringify(stockList));
         }
 
-        // 履歴から一番新しい該当レコードを削除
         const hIdx = historyRecords.findIndex(h => h.name === item.name && h.day === item.day && h.time === item.time);
         if (hIdx !== -1) {
           historyRecords.splice(hIdx, 1);
@@ -1029,7 +1134,7 @@
       if (!target) return;
 
       const duplicated = JSON.parse(JSON.stringify(target));
-      duplicated.completed = false; // コピー時は未完了に
+      duplicated.completed = false;
       currentSchedules.splice(idx + 1, 0, duplicated);
       localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
       renderSchedule();
@@ -1149,7 +1254,6 @@
         </div>
       `).join('');
 
-      // 履歴項目の長押し削除イベントの紐付け
       document.querySelectorAll('.history-item').forEach(item => {
         let timer = null;
         const idx = parseInt(item.getAttribute('data-index'));
