@@ -146,6 +146,7 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   list-style: none;
   padding: 0;
   margin: 12px 0 0;
+  overflow: hidden; /* スライド時にはみ出た部分を隠す */
 }
 
 #shoppingList li {
@@ -163,7 +164,14 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  transition: all 0.15s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+/* 💡 追加：スライドして消えるときのアニメーション用スタイル */
+#shoppingList li.slide-out {
+  transform: translateX(-100%);
+  opacity: 0;
 }
 
 #shoppingList li.purchased {
@@ -215,18 +223,15 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   color: #555;
   padding: 3px 0;
 }
+
 /* ボタンのCSS */
 .button {
-  /* ▼ここからが真ん中に寄せる設定▼ */
   display: flex;
   justify-content: center;
   align-items: center;
-  line-height: 1; /* 余計な隙間をなくす */
-  padding: 0;     /* ブラウザ固有のズレをなくす */
-  /* ▲ここまで▲ */
-
-  /* 以下はご自身のボタンのサイズや色に合わせて調整してください */
+  line-height: 1;
+  padding: 0;
   width: 40px;
   height: 40px;
-  border-radius: 50%; /* 丸くする */
+  border-radius: 50%;
 }

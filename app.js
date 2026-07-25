@@ -348,13 +348,113 @@ function addShoppingListItem(name, price, count) {
   li.setAttribute('data-price', price || 0);
 
   const displayName = count > 1 ? `${name} (${count})` : name;
-
   li.innerHTML = `<span>${displayName}</span><span>${price}円</span>`;
   
-  li.onclick = function() {
-    this.classList.toggle('purchased');
-    updateShoppingTotals();
-  };
+  let startX = 0;
+  let currentX = 0;
+  let isDragging = false;
+
+  // --- タッチ操作（スマホ） ---
+  li.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    isDragging = true;
+    li.style.transition = 'none';
+  }, { passive: true });
+
+  li.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    currentX = e.touches[0].clientX;
+    let diff = currentX - startX;
+
+    // 左にスライドしている時だけカードを左にずらす
+    if (diff < 0) {
+      li.style.transform = `translateX(${diff}px)`;
+      li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
+    }
+  }, { passive: true });
+
+  li.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    let diff = currentX - startX;
+    li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+    // 🔴 判定1: -80px以上「左に大きくスライド」した場合は削除
+    if (diff < -80) {
+      li.style.transform = 'translateX(-100%)';
+      li.style.opacity = '0';
+      setTimeout(() => {
+        li.remove();
+        updateShoppingTotals();
+      }, 200);
+    } 
+    // 🟡 判定2: 移動距離がほとんどない（-15px〜15px以内）場合は「タップ」と判定してグレーアウト
+    else if (Math.abs(diff) <= 15) {
+      li.style.transform = 'translateX(0)';
+      li.style.opacity = '1';
+      li.classList.toggle('purchased');
+      updateShoppingTotals();
+    } 
+    // ⚪ 判定3: 途中で指を離した場合は元の位置に戻す
+    else {
+      li.style.transform = 'translateX(0)';
+      li.style.opacity = '1';
+    }
+    
+    startX = 0;
+    currentX = 0;
+  });
+
+  // --- マウス操作（PCテスト用） ---
+  li.addEventListener('mousedown', (e) => {
+    startX = e.clientX;
+    currentX = startX;
+    isDragging = true;
+    li.style.transition = 'none';
+
+    const onMouseMove = (ev) => {
+      if (!isDragging) return;
+      currentX = ev.clientX;
+      let diff = currentX - startX;
+      if (diff < 0) {
+        li.style.transform = `translateX(${diff}px)`;
+        li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
+      }
+    };
+
+    const onMouseUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      let diff = currentX - startX;
+      li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+      if (diff < -80) {
+        li.style.transform = 'translateX(-100%)';
+        li.style.opacity = '0';
+        setTimeout(() => {
+          li.remove();
+          updateShoppingTotals();
+        }, 200);
+      } else if (Math.abs(diff) <= 15) {
+        li.style.transform = 'translateX(0)';
+        li.style.opacity = '1';
+        li.classList.toggle('purchased');
+        updateShoppingTotals();
+      } else {
+        li.style.transform = 'translateX(0)';
+        li.style.opacity = '1';
+      }
+
+      startX = 0;
+      currentX = 0;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
 
   shoppingList.appendChild(li);
 }
@@ -378,14 +478,20 @@ function updateShoppingTotals() {
   const totalTax = Math.floor(totalPrice * 1.08);
   const remainingTax = Math.floor(remainingPrice * 1.08);
 
-  document.getElementById('purchasedPrice').textContent = purchasedPrice.toLocaleString();
-  document.getElementById('purchasedTax').textContent = purchasedTax.toLocaleString();
+  const purchasedPriceEl = document.getElementById('purchasedPrice');
+  const purchasedTaxEl = document.getElementById('purchasedTax');
+  if (purchasedPriceEl) purchasedPriceEl.textContent = purchasedPrice.toLocaleString();
+  if (purchasedTaxEl) purchasedTaxEl.textContent = purchasedTax.toLocaleString();
   
-  document.getElementById('totalPrice').textContent = totalPrice.toLocaleString();
-  document.getElementById('totalTax').textContent = totalTax.toLocaleString();
+  const totalPriceEl = document.getElementById('totalPrice');
+  const totalTaxEl = document.getElementById('totalTax');
+  if (totalPriceEl) totalPriceEl.textContent = totalPrice.toLocaleString();
+  if (totalTaxEl) totalTaxEl.textContent = totalTax.toLocaleString();
   
-  document.getElementById('remainingPrice').textContent = remainingPrice.toLocaleString();
-  document.getElementById('remainingTax').textContent = remainingTax.toLocaleString();
+  const remainingPriceEl = document.getElementById('remainingPrice');
+  const remainingTaxEl = document.getElementById('remainingTax');
+  if (remainingPriceEl) remainingPriceEl.textContent = remainingPrice.toLocaleString();
+  if (remainingTaxEl) remainingTaxEl.textContent = remainingTax.toLocaleString();
 }
 
 function backToMenuSelect() {
@@ -393,7 +499,7 @@ function backToMenuSelect() {
   document.getElementById('shoppingListCard').style.display = 'none';
 }
 
-// 登録済み献立の管理エリア描画（削除ボタンのサイズ・形状をコンパクトに修正）
+// 登録済み献立の管理エリア描画
 function renderManageMenus() {
   const container = document.getElementById('manageMenuList');
   if (!container) return;
@@ -431,7 +537,6 @@ function renderManageMenus() {
   });
 }
 
-// 登録済みの献立に新しい材料行を追加
 function addIngredientToMenu(menuIndex) {
   menus[menuIndex].ingredients.push({ name: '', price: 0 });
   localStorage.setItem('menus', JSON.stringify(menus));
@@ -439,7 +544,6 @@ function addIngredientToMenu(menuIndex) {
   renderMenus();
 }
 
-// 登録済み献立から特定の材料を削除
 function deleteIngredientFromMenu(menuIndex, ingIndex) {
   menus[menuIndex].ingredients.splice(ingIndex, 1);
   localStorage.setItem('menus', JSON.stringify(menus));
@@ -591,7 +695,6 @@ renderMenus();
 renderSelectableIngredients();
 updateSelectionSummary();
 
-// 選択された「献立」と「追加食材」をtxtファイルとしてダウンロード
 function exportMenuTxt() {
   const { selectedMenus, selectedIngs } = getSelectedItemsData();
 
@@ -601,7 +704,6 @@ function exportMenuTxt() {
 
   let textContent = "=== 買い物・献立リスト ===\n\n";
 
-  // 1. 選択された献立と材料を出力
   if (selectedMenus.length > 0) {
     textContent += "【献立】\n";
     selectedMenus.forEach(item => {
@@ -617,7 +719,6 @@ function exportMenuTxt() {
     });
   }
 
-  // 2. 単品で選択された食材があれば出力
   if (selectedIngs.length > 0) {
     textContent += "【単品追加の食材】\n";
     selectedIngs.forEach(item => {
@@ -630,7 +731,6 @@ function exportMenuTxt() {
     textContent += "\n";
   }
 
-  // ファイルダウンロード処理
   const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
