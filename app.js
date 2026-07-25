@@ -23,12 +23,18 @@ let editingMasterIndex = null;
 let editingEatOutIndex = null;
 let editingMenuIndex = null;
 
-// ★ 確実に即時同期・保存を行う関数
+// ★ 予定データを完全に即時・同期してストレージへ書き込む強固な保存関数
 function saveSchedulesToStorage() {
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  try {
+    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  } catch (e) {
+    console.error('Storage save error:', e);
+  }
 }
 
+// ページ離脱やリロード、バックグラウンド移行時に強制保存
 window.addEventListener('pagehide', saveSchedulesToStorage);
+window.addEventListener('beforeunload', saveSchedulesToStorage);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     saveSchedulesToStorage();
@@ -945,7 +951,7 @@ function onScheduleInput(day, time, index) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].name = val;
-  saveSchedulesToStorage(); // 変更のたびに即時ストレージへ書き込み
+  saveSchedulesToStorage(); // 入力の都度、即座にストレージへ直書き
 
   if (isEatOutItem(val)) {
     inputEl.classList.add('is-eatout');
@@ -998,12 +1004,10 @@ function onScheduleInput(day, time, index) {
       });
 
   if (matches.length > 0) {
-    // ★ mousedown や touchstart を使って、サジェストをタップした瞬間に確実に値が確定・保存されるように変更
     suggestBox.innerHTML = matches.map(name => `
       <div class="suggest-item" data-day="${day}" data-time="${time}" data-index="${index}" data-name="${name.replace(/"/g, '&quot;')}">${name}</div>
     `).join('');
     
-    // サジェスト項目のクリック/タップイベントを設定
     suggestBox.querySelectorAll('.suggest-item').forEach(item => {
       const handleSelect = (e) => {
         e.preventDefault();
@@ -1030,7 +1034,7 @@ function onScheduleBlur(day, time, index) {
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   currentSchedules[keyStr].name = inputEl.value;
-  saveSchedulesToStorage(); // フォーカスが外れた瞬間にも強制保存
+  saveSchedulesToStorage(); // フォーカス外れた時にも確実に保存
 }
 
 function selectSuggest(day, time, index, menuName) {
@@ -1043,8 +1047,7 @@ function selectSuggest(day, time, index, menuName) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   currentSchedules[keyStr].name = menuName;
   
-  // ★ 選択された瞬間に即座にストレージへ保存し、同期を確実に完了させる
-  saveSchedulesToStorage();
+  saveSchedulesToStorage(); // 候補選択時に即座に保存
   renderSchedule();
 }
 
