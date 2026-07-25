@@ -298,6 +298,9 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
+```[cite: 3]
+
+これにより、iPhoneのブラウザが古いキャッシュを読み込むのを強制的に防ぎ、リロード時にも確実に最新の `app.js`（入力値がリアルタイムかつ確実に `localStorage` に保存される仕組み）が適用されるようになります。お手数をおかけしますが、こちらをお試しください。
