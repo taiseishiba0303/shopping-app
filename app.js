@@ -355,7 +355,7 @@ function addShoppingListItem(name, price, count) {
   let isDragging = false;
   let hasMoved = false;
 
-  // --- タッチ操作（スマホ） ---
+  // --- タッチ操作（スマホ用：ワンタップですぐに反応するように最適化） ---
   li.addEventListener('touchstart', (e) => {
     startX = e.touches[0].clientX;
     currentX = startX;
@@ -369,18 +369,17 @@ function addShoppingListItem(name, price, count) {
     currentX = e.touches[0].clientX;
     let diff = currentX - startX;
 
-    if (Math.abs(diff) > 8) {
+    if (Math.abs(diff) > 5) {
       hasMoved = true;
     }
 
-    // 左にスライドしている時だけカードを左にずらす
     if (diff < 0) {
       li.style.transform = `translateX(${diff}px)`;
       li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
     }
   }, { passive: true });
 
-  li.addEventListener('touchend', () => {
+  li.addEventListener('touchend', (e) => {
     if (!isDragging) return;
     isDragging = false;
     let diff = currentX - startX;
@@ -395,14 +394,15 @@ function addShoppingListItem(name, price, count) {
         updateShoppingTotals();
       }, 200);
     } 
-    // 2. ほとんど動かしていない（タップされた）場合はグレーアウトを切り替え
+    // 2. 指をほとんど動かさずに離した（ワンタップ）場合：即座にグレーアウト切替
     else if (!hasMoved || Math.abs(diff) <= 10) {
+      e.preventDefault(); // スマホ特有の二重クリックやズーム動作を防止
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
       li.classList.toggle('purchased');
       updateShoppingTotals();
     } 
-    // 3. 中途半端に動かして離した場合は元に戻す
+    // 3. 中途半端に戻した場合
     else {
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
@@ -413,6 +413,14 @@ function addShoppingListItem(name, price, count) {
   });
 
   // --- マウス操作（PCテスト用） ---
+  li.addEventListener('click', (e) => {
+    // タッチデバイス以外のPCクリック時に確実にトグルさせる
+    if (e.pointerType === 'touch') return; // タッチはtouchend側で処理するため除外
+    li.classList.toggle('purchased');
+    updateShoppingTotals();
+  });
+
+  // PCでのドラッグ削除用（mousedown）
   li.addEventListener('mousedown', (e) => {
     startX = e.clientX;
     currentX = startX;
@@ -424,7 +432,7 @@ function addShoppingListItem(name, price, count) {
       if (!isDragging) return;
       currentX = ev.clientX;
       let diff = currentX - startX;
-      if (Math.abs(diff) > 8) {
+      if (Math.abs(diff) > 5) {
         hasMoved = true;
       }
       if (diff < 0) {
@@ -446,7 +454,7 @@ function addShoppingListItem(name, price, count) {
           li.remove();
           updateShoppingTotals();
         }, 200);
-      } else if (!hasMoved || Math.abs(diff) <= 10) {
+      } else if (!hasMoved) {
         li.style.transform = 'translateX(0)';
         li.style.opacity = '1';
         li.classList.toggle('purchased');
