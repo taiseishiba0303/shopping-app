@@ -12,6 +12,13 @@
 </head>
 <body>
 
+  <!-- stock.htmlへの移動リンク -->
+  <div style="margin: 12px 16px 0 16px;">
+    <a href="stock.html" style="display: block; text-align: center; background-color: #2e7d32; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.95rem;">
+      📅 献立スケジュール＆在庫管理へ ➔
+    </a>
+  </div>
+
   <!-- メインタブボタン -->
   <div class="tab-menu">
     <button id="tabBtn1" class="tab-btn active" onclick="switchTab('tab1')">🛒 買い物</button>
@@ -50,9 +57,11 @@
     <!-- 買い物リストカード（初期状態は非表示） -->
     <section class="card highlight" id="shoppingListCard" style="display: none;">
       <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 選ぶ画面に戻る</button>
-      <button type="button" onclick="exportMenuTxt()" style="background:#2196F3; color:white; border:none; border-radius:6px; padding:10px 16px; font-weight:bold; cursor:pointer; margin-left:8px;">
-  📄 献立・食材をtxt出力</button>
-</button>
+      
+      <!-- 直接スケジュール管理へ送信するボタン -->
+      <button type="button" onclick="sendToScheduleApp()" style="background:#2e7d32; color:white; border:none; border-radius:8px; padding:12px 16px; font-weight:bold; cursor:pointer; width:100%; margin-bottom:12px; font-size: 0.95rem;">
+        📅 この献立をスケジュール管理に送信して蓄積 ➔
+      </button>
       
       <!-- 金額サマリーエリア -->
       <div class="price-summary">
@@ -111,13 +120,56 @@
     </section>
   </div>
 
-  <!-- stock.htmlへの移動リンク -->
-<div style="margin-bottom: 16px;">
-  <a href="stock.html" style="display: inline-block; background-color: #2e7d32; color: white; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.9rem;">
-    📅 献立スケジュール＆在庫管理へ ➔
-  </a>
-</div>
-
   <script src="app.js"></script>
+  <script>
+    // 選択された献立を stock.html の「今週の予定」へ直接送信する関数
+    function sendToScheduleApp() {
+      // app.js内の関数を使って選択中の献立データを取得
+      const selection = getSelectedItemsData();
+      const selectedMenus = selection.selectedMenus;
+
+      if (!selectedMenus || selectedMenus.length === 0) {
+        alert('送信する献立が選択されていません！リストから献立を選んでください。');
+        return;
+      }
+
+      // stock.htmlと合わせ、今週の予定(currentSchedules)と在庫(stockIngredients)を取得
+      let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
+      let stockIngredients = JSON.parse(localStorage.getItem('stockIngredients')) || {};
+
+      // 選択された献立を「今週の予定」に追加
+      selectedMenus.forEach(item => {
+        const menuObj = menus.find(m => m.id === item.id);
+        if (!menuObj) return;
+
+        // 数量（qty）の分だけ予定リストに展開して追加
+        for (let i = 0; i < (item.qty || 1); i++) {
+          currentSchedules.push({
+            id: Date.now() + Math.random(),
+            name: menuObj.name,
+            day: '未定', // デフォルトの曜日
+            time: '昼',  // デフォルトの時間
+            ingredients: menuObj.ingredients ? menuObj.ingredients.map(ing => ing.name) : []
+          });
+        }
+
+        // 食材在庫リストにも自動追加
+        if (menuObj.ingredients) {
+          menuObj.ingredients.forEach(ing => {
+            if (ing.name && stockIngredients[ing.name] === undefined) {
+              stockIngredients[ing.name] = 1; // 初期値1
+            }
+          });
+        }
+      });
+
+      // 正しいキー名（currentSchedules）でローカルストレージに保存
+      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+      localStorage.setItem('stockIngredients', JSON.stringify(stockIngredients));
+
+      // stock.htmlへ移動
+      window.location.href = 'stock.html';
+    }
+  </script>
 </body>
 </html>
