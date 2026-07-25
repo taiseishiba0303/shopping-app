@@ -857,7 +857,6 @@ function renderSchedule() {
 
   container.innerHTML = fixedScheduleKeys.map((keyObj, index) => {
     const keyStr = `${keyObj.day}_${keyObj.time}`;
-    // localStorage から確実に最新データを復元
     const data = currentSchedules[keyStr] || { name: '', completed: false, excludePrice: false };
     
     const basePrice = getMenuPrice(data.name);
@@ -937,16 +936,15 @@ function onScheduleInput(day, time, index) {
   const inputEl = document.getElementById(`sched-input-${index}`);
   const suggestBox = document.getElementById(`suggest-box-${index}`);
   if (!inputEl) return;
-  const val = inputEl.value.trim();
+  const val = inputEl.value;
 
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
-  // 入力値を確実に保存する
-  currentSchedules[keyStr].name = inputEl.value;
+  currentSchedules[keyStr].name = val;
   localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
 
-  if (isEatOutItem(inputEl.value)) {
+  if (isEatOutItem(val)) {
     inputEl.classList.add('is-eatout');
   } else {
     inputEl.classList.remove('is-eatout');
@@ -966,7 +964,7 @@ function onScheduleInput(day, time, index) {
   }
   
   const priceCell = document.querySelector(`#sched-row-${index} td:nth-child(3)`);
-  const currentPrice = getMenuPrice(inputEl.value);
+  const currentPrice = getMenuPrice(val);
   const isExcluded = currentSchedules[keyStr].excludePrice;
   
   if (priceCell) {
@@ -982,20 +980,21 @@ function onScheduleInput(day, time, index) {
   }
 
   if (!suggestBox) return;
+  const trimmedVal = val.trim();
   let candidates = [];
   menus.forEach(m => candidates.push(m.name));
   eatOutStores.forEach(s => candidates.push(s.name));
 
-  const normalizedVal = toHiragana(val).toLowerCase();
+  const normalizedVal = toHiragana(trimmedVal).toLowerCase();
 
-  const matches = val === '' 
+  const matches = trimmedVal === '' 
     ? candidates 
     : candidates.filter(name => {
         const normalizedName = toHiragana(name).toLowerCase();
         return normalizedName.includes(normalizedVal);
       });
 
-  if (matches.length > 0) {
+  if (trimmedVal !== '' && matches.length > 0) {
     suggestBox.innerHTML = matches.map(name => `
       <div class="suggest-item" onclick="selectSuggest('${day}', '${time}', ${index}, '${name.replace(/'/g, "\\'")}')">${name}</div>
     `).join('');
