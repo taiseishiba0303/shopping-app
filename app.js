@@ -332,10 +332,33 @@ function updateSelectionSummary() {
 
 function generateShoppingList() {
   const consolidatedList = getConsolidatedIngredients();
+  const { selectedMenus } = getSelectedItemsData();
 
   if (consolidatedList.length === 0) {
     return alert('献立または食材を1つ以上選択してください');
   }
+
+  // ★追加: stock.html 側の「食べる予定リスト」へ選択された献立を連携・保存する処理
+  let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
+  
+  selectedMenus.forEach(item => {
+    const menu = menus.find(m => m.id === item.id);
+    if (menu) {
+      for (let i = 0; i < item.qty; i++) {
+        // 重複しにくいユニークなIDと、必要な食材リストを持たせる
+        currentSchedules.push({
+          id: Date.now() + Math.random(),
+          name: menu.name,
+          day: '未定',
+          time: '昼',
+          ingredients: menu.ingredients ? menu.ingredients.map(ing => ing.name) : [],
+          completed: false
+        });
+      }
+    }
+  });
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  // -------------------------------------------------------------
 
   const shoppingList = document.getElementById('shoppingList');
   shoppingList.innerHTML = '';

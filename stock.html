@@ -315,6 +315,7 @@
   const timesList = ['朝', '昼', '夜', '間食'];
   const timeOrder = { '朝': 1, '昼': 2, '夜': 3, '間食': 4 };
 
+  // 買い物リスト側からのデータを安全に同期する
   function syncWithLocalStorage() {
     const raw = localStorage.getItem('currentSchedules');
     let incomingList = [];
@@ -324,10 +325,22 @@
       incomingList = [];
     }
 
+    // 既存のスケジュールIDをマップ化
+    const existingMap = new Map(currentSchedules.map(item => [String(item.id), item]));
+    const updatedSchedules = [];
+
     incomingList.forEach(incoming => {
-      const exists = currentSchedules.some(existing => String(existing.id) === String(incoming.id));
-      if (!exists) {
-        currentSchedules.push({
+      const idStr = String(incoming.id || (incoming.name + '_' + incoming.day));
+      if (existingMap.has(idStr)) {
+        // 既存のものは完了状態などを維持しつつ、名前や食材を更新
+        const existing = existingMap.get(idStr);
+        existing.name = incoming.name || existing.name;
+        existing.ingredients = incoming.ingredients || existing.ingredients || [];
+        updatedSchedules.push(existing);
+        existingMap.delete(idStr);
+      } else {
+        // 新規追加
+        updatedSchedules.push({
           id: incoming.id || (Date.now() + Math.random()),
           name: incoming.name,
           day: incoming.day || '未定',
@@ -337,6 +350,21 @@
         });
       }
     });
+
+    // ユーザーが手動で追加したかもしれない既存データも保持する場合
+    currentSchedules = updatedSchedules;
+
+    // 食材在庫リストの初期同期（買い物リストから送られてきた食材を在庫に自動登録）
+    incomingList.forEach(item => {
+      if (item.ingredients && Array.isArray(item.ingredients)) {
+        item.ingredients.forEach(ing => {
+          if (ing && stockIngredients[ing] === undefined) {
+            stockIngredients[ing] = 1; // デフォルト在庫1
+          }
+        });
+      }
+    });
+
     saveDataOnly();
   }
 
@@ -528,14 +556,14 @@
 
       const header = document.createElement('div');
       header.className = 'accordion-header';
-      header.innerHTML = `<span>📂 ${groupName}</span> <span style="font-size:0.8rem; background:#fff; padding:2px 8px; border-radius:10px; color:#2e7d32;">${consolidatedList.length}件 ▼</span>`;
+      header.innerHTML = `📂 ${groupName} <span style="font-size:0.8rem; background:#fff; padding:2px 8px; border-radius:10px; color:#2e7d32;">${consolidatedList.length}件 ▼</span>`;
 
       const content = document.createElement('div');
       content.className = 'accordion-content';
 
       header.onclick = () => {
         content.classList.toggle('open');
-        const badge = header.querySelector('span:last-child');
+        const badge = header.querySelector('span');
         badge.textContent = content.classList.contains('open') ? `${consolidatedList.length}件 ▲` : `${consolidatedList.length}件 ▼`;
       };
 
@@ -567,7 +595,8 @@
     const countEl = document.getElementById('stockCount');
     const keys = Object.keys(stockIngredients);
     container.innerHTML = '';
-    countEl.textContent = `${keys.length}種類`;
+    countEndText = `${keys.length}種類`;
+    if(countEl) countEl.textContent = `${keys.length}種類`;
 
     if (keys.length === 0) {
       container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px 0;">食材はありません</p>';
@@ -612,6 +641,7 @@
     }
   }
 
+  // 起動時の実行
   syncWithLocalStorage();
   renderSchedule();
   renderHistory();
