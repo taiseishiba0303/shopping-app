@@ -3,6 +3,9 @@ let eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
 let menus = JSON.parse(localStorage.getItem('menus')) || [];
 let shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
 let stockList = JSON.parse(localStorage.getItem('stockList')) || [];
+let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+let historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+let unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
 
 let fixedScheduleKeys = [
   { day: '月', time: '昼' }, { day: '月', time: '夜' },
@@ -14,10 +17,6 @@ let fixedScheduleKeys = [
   { day: '日', time: '昼' }, { day: '日', time: '夜' }
 ];
 
-let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
-let historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
-let unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
-
 let editingShoppingIndex = null;
 let editingMasterIndex = null;
 let editingEatOutIndex = null;
@@ -26,12 +25,12 @@ let activeScheduleTarget = null;
 
 function persistAllData() {
   try {
-    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+    localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+    localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
     localStorage.setItem('menus', JSON.stringify(menus));
     localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
     localStorage.setItem('stockList', JSON.stringify(stockList));
-    localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
-    localStorage.setItem('eatOutStores', JSON.stringify(eatOutStores));
+    localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
     localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
     localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
   } catch (e) {
@@ -39,10 +38,26 @@ function persistAllData() {
   }
 }
 
+function loadAllData() {
+  try {
+    masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+    eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
+    menus = JSON.parse(localStorage.getItem('menus')) || [];
+    shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+    stockList = JSON.parse(localStorage.getItem('stockList')) || [];
+    currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+    historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+    unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+  } catch (e) {
+    console.error('Load error:', e);
+  }
+}
+
 window.addEventListener('beforeunload', persistAllData);
 window.addEventListener('pagehide', persistAllData);
 
 function switchTab(tabId) {
+  loadAllData();
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
@@ -65,6 +80,7 @@ function switchTab(tabId) {
 }
 
 function switchDbSubTab(sub) {
+  loadAllData();
   const isIng = sub === 'ing';
   const isMenu = sub === 'menu';
   const isEat = sub === 'eat';
@@ -102,6 +118,7 @@ function switchSubTab(sub) {
 }
 
 function renderMenuSelect() {
+  loadAllData();
   const container = document.getElementById('menuList');
   if (!container) return;
   if (menus.length === 0) {
@@ -125,6 +142,7 @@ function renderMenuSelect() {
 }
 
 function renderSelectIngredients() {
+  loadAllData();
   const container = document.getElementById('selectIngList');
   if (!container) return;
   if (masterIngredients.length === 0) {
@@ -164,6 +182,7 @@ function changeQty(numId, amount) {
 }
 
 function updateSummary() {
+  loadAllData();
   const summaryBox = document.getElementById('selectedItemsSummary');
   if (!summaryBox) return;
   const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
@@ -192,6 +211,7 @@ function updateSummary() {
 }
 
 function generateShoppingListFromSchedule() {
+  loadAllData();
   let rawItems = [];
   fixedScheduleKeys.forEach(keyObj => {
     const keyStr = `${keyObj.day}_${keyObj.time}`;
@@ -234,6 +254,7 @@ function generateShoppingListFromSchedule() {
 }
 
 function addSelectedItemsToShoppingList() {
+  loadAllData();
   const checkedMenus = Array.from(document.querySelectorAll('.menu-checkbox:checked'));
   const checkedIngs = Array.from(document.querySelectorAll('.ing-checkbox:checked'));
   let rawItems = [];
@@ -299,7 +320,7 @@ function backToShoppingMain() {
 }
 
 function renderShoppingListView() {
-  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+  loadAllData();
   const container = document.getElementById('shoppingList');
   if (!container) return;
   
@@ -312,7 +333,7 @@ function renderShoppingListView() {
           ${item.name} 
           <span style="font-size:0.85rem; color:#666; margin-left:6px;">(×${item.qty})</span>
         </div>
-        <span style="color:#2e7d32; font-weight:bold;">${item.totalPrice.toLocaleString()}円</span>
+        <span style="color:#2e7d32; font-weight:bold;">${(item.totalPrice || 0).toLocaleString()}円</span>
       </li>
     `).join('');
   }
@@ -354,6 +375,7 @@ function renderShoppingListView() {
 }
 
 function toggleShoppingItem(idx) {
+  loadAllData();
   shoppingList[idx].completed = !shoppingList[idx].completed;
   persistAllData();
   renderShoppingListView();
@@ -379,7 +401,9 @@ function closeShoppingModal() {
 
 function modalChangeQty(amount) {
   if (editingShoppingIndex === null) return;
+  loadAllData();
   let item = shoppingList[editingShoppingIndex];
+  if (!item) return;
   item.qty += amount;
   if (item.qty < 1) item.qty = 1;
 
@@ -394,6 +418,7 @@ function modalChangeQty(amount) {
 
 function modalDeleteShoppingItem() {
   if (editingShoppingIndex === null) return;
+  loadAllData();
   shoppingList.splice(editingShoppingIndex, 1);
   persistAllData();
   closeShoppingModal();
@@ -401,6 +426,7 @@ function modalDeleteShoppingItem() {
 }
 
 function sendToStock() {
+  loadAllData();
   if (shoppingList.length === 0) { alert('買い物リストに項目がありません。'); return; }
   
   shoppingList.forEach(item => {
@@ -418,6 +444,7 @@ function sendToStock() {
 }
 
 function renderStock() {
+  loadAllData();
   const container = document.getElementById('stockListContainer');
   if (!container) return;
   if (stockList.length === 0) {
@@ -446,6 +473,7 @@ function renderStock() {
 }
 
 function updateStockQty(idx, amount) {
+  loadAllData();
   stockList[idx].qty += amount;
   if (stockList[idx].qty < 0) stockList[idx].qty = 0;
   persistAllData();
@@ -453,6 +481,7 @@ function updateStockQty(idx, amount) {
 }
 
 function saveMasterIngredient() {
+  loadAllData();
   const nameEl = document.getElementById('masterIngName');
   const priceEl = document.getElementById('masterIngPrice');
   if (!nameEl) return;
@@ -467,6 +496,7 @@ function saveMasterIngredient() {
 }
 
 function saveBulkIngredients() {
+  loadAllData();
   const textEl = document.getElementById('bulkIngInput');
   if (!textEl) return;
   const text = textEl.value.trim();
@@ -486,6 +516,7 @@ function saveBulkIngredients() {
 }
 
 function renderMasterIngredients() {
+  loadAllData();
   const container = document.getElementById('masterIngList');
   if (!container) return;
   if (masterIngredients.length === 0) {
@@ -534,6 +565,7 @@ function closeMasterIngModal() {
 
 function updateMasterIngredient() {
   if (editingMasterIndex === null) return;
+  loadAllData();
   const nameEl = document.getElementById('editMasterName');
   const priceEl = document.getElementById('editMasterPrice');
   const name = nameEl ? nameEl.value.trim() : '';
@@ -547,6 +579,7 @@ function updateMasterIngredient() {
 
 function deleteMasterIngredientFromModal() {
   if (editingMasterIndex === null) return;
+  loadAllData();
   if (confirm(`「${masterIngredients[editingMasterIndex].name}」を削除しますか？`)) {
     masterIngredients.splice(editingMasterIndex, 1);
     persistAllData();
@@ -556,6 +589,7 @@ function deleteMasterIngredientFromModal() {
 }
 
 function saveEatOutStore() {
+  loadAllData();
   const nameEl = document.getElementById('eatOutStoreName');
   const priceEl = document.getElementById('eatOutStorePrice');
   if (!nameEl) return;
@@ -570,6 +604,7 @@ function saveEatOutStore() {
 }
 
 function renderEatOutStores() {
+  loadAllData();
   const container = document.getElementById('eatOutStoreList');
   if (!container) return;
   if (eatOutStores.length === 0) {
@@ -618,6 +653,7 @@ function closeEatOutStoreModal() {
 
 function updateEatOutStore() {
   if (editingEatOutIndex === null) return;
+  loadAllData();
   const nameEl = document.getElementById('editEatOutStoreName');
   const priceEl = document.getElementById('editEatOutStorePrice');
   const name = nameEl ? nameEl.value.trim() : '';
@@ -631,6 +667,7 @@ function updateEatOutStore() {
 
 function deleteEatOutStoreFromModal() {
   if (editingEatOutIndex === null) return;
+  loadAllData();
   if (confirm(`「${eatOutStores[editingEatOutIndex].name}」を削除しますか？`)) {
     eatOutStores.splice(editingEatOutIndex, 1);
     persistAllData();
@@ -640,6 +677,7 @@ function deleteEatOutStoreFromModal() {
 }
 
 function exportBackupData() {
+  loadAllData();
   const data = { masterIngredients, eatOutStores, menus, shoppingList, stockList, currentSchedules, historyRecords, unitPrices };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -695,6 +733,7 @@ function addIngredientRow() {
 }
 
 function saveMenu() {
+  loadAllData();
   const nameEl = document.getElementById('menuName');
   if (!nameEl) return;
   const name = nameEl.value.trim();
@@ -716,6 +755,7 @@ function saveMenu() {
 }
 
 function renderManageMenus() {
+  loadAllData();
   const container = document.getElementById('manageMenuList');
   if (!container) return;
   if (menus.length === 0) {
@@ -747,6 +787,7 @@ function renderManageMenus() {
 }
 
 function openMenuModal(idx) {
+  loadAllData();
   editingMenuIndex = idx;
   const menu = menus[idx];
   const nameEl = document.getElementById('editMenuName');
@@ -791,6 +832,7 @@ function addEditIngredientRow() {
 
 function updateMenu() {
   if (editingMenuIndex === null) return;
+  loadAllData();
   const nameEl = document.getElementById('editMenuName');
   const name = nameEl ? nameEl.value.trim() : '';
   if (!name) { alert('献立名を入力してください'); return; }
@@ -810,6 +852,7 @@ function updateMenu() {
 
 function duplicateMenuFromModal() {
   if (editingMenuIndex === null) return;
+  loadAllData();
   const target = menus[editingMenuIndex];
   const duplicated = JSON.parse(JSON.stringify(target));
   duplicated.name = target.name + 'のコピー';
@@ -821,6 +864,7 @@ function duplicateMenuFromModal() {
 
 function deleteMenuFromModal() {
   if (editingMenuIndex === null) return;
+  loadAllData();
   if (confirm(`「${menus[editingMenuIndex].name}」を削除しますか？`)) {
     menus.splice(editingMenuIndex, 1);
     persistAllData();
@@ -850,6 +894,7 @@ function getMenuPrice(menuName) {
 }
 
 function openSchedulePicker(day, time, index) {
+  loadAllData();
   activeScheduleTarget = { day, time, index };
   const modal = document.getElementById('schedulePickerModal');
   if (!modal) {
@@ -884,6 +929,7 @@ function createSchedulePickerModalDOM() {
 }
 
 function renderSchedulePickerContent() {
+  loadAllData();
   const container = document.getElementById('pickerListContent');
   const titleEl = document.getElementById('pickerTitle');
   if (!container || !activeScheduleTarget) return;
@@ -921,6 +967,7 @@ function renderSchedulePickerContent() {
 
 function applySchedulePickerValue(name) {
   if (!activeScheduleTarget) return;
+  loadAllData();
   const { day, time } = activeScheduleTarget;
   const keyStr = `${day}_${time}`;
   
@@ -943,6 +990,7 @@ function selectCustomPickerValue() {
 
 function clearSchedulePickerValue() {
   if (!activeScheduleTarget) return;
+  loadAllData();
   const { day, time } = activeScheduleTarget;
   const keyStr = `${day}_${time}`;
   if (currentSchedules[keyStr]) {
@@ -960,6 +1008,7 @@ function closeSchedulePicker() {
 }
 
 function renderSchedule() {
+  loadAllData();
   const container = document.getElementById('currentScheduleTableBody');
   if (!container) return;
   let totalScheduleSum = 0;
@@ -1012,6 +1061,7 @@ function renderSchedule() {
 }
 
 function toggleSchedulePrice(day, time) {
+  loadAllData();
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
@@ -1022,13 +1072,14 @@ function toggleSchedulePrice(day, time) {
 
 function resetAllSchedules() {
   if (confirm('今週のスケジュール（入力内容やチェック状態）をすべてリセットしますか？この操作は元に戻せません。')) {
-    localStorage.removeItem('currentSchedules');
     currentSchedules = {};
+    persistAllData();
     renderSchedule();
   }
 }
 
 function toggleCompleteSchedule(day, time, index) {
+  loadAllData();
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   const item = currentSchedules[keyStr];
@@ -1075,6 +1126,7 @@ function toggleCompleteSchedule(day, time, index) {
 }
 
 function renderHistory() {
+  loadAllData();
   const container = document.getElementById('historyListContainer');
   if (!container) return;
   if (historyRecords.length === 0) {
@@ -1110,6 +1162,7 @@ function renderHistory() {
     const idx = parseInt(item.getAttribute('data-index'));
     const startLongPress = () => {
       timer = setTimeout(() => {
+        loadAllData();
         if (confirm(`🎵「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
           historyRecords.splice(idx, 1);
           persistAllData();
@@ -1130,6 +1183,7 @@ function renderHistory() {
 }
 
 function exportHistoryTxt() {
+  loadAllData();
   if (historyRecords.length === 0) { alert('出力する履歴がありません。'); return; }
   let textContent = '【 食べた記録（履歴） 】\n\n';
   const grouped = {};
@@ -1160,15 +1214,7 @@ function clearHistory() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
-  eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
-  menus = JSON.parse(localStorage.getItem('menus')) || [];
-  shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
-  stockList = JSON.parse(localStorage.getItem('stockList')) || [];
-  currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
-  historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
-  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
-
+  loadAllData();
   initIngredientInputs();
   renderSchedule();
   renderHistory();
