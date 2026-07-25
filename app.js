@@ -1157,7 +1157,15 @@ function clearHistory() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  masterIngredients = JSON.parse(localStorage.getItem('masterIngredients')) || [];
+  eatOutStores = JSON.parse(localStorage.getItem('eatOutStores')) || [];
+  menus = JSON.parse(localStorage.getItem('menus')) || [];
+  shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+  stockList = JSON.parse(localStorage.getItem('stockList')) || [];
   currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || {};
+  historyRecords = JSON.parse(localStorage.getItem('historyRecords')) || [];
+  unitPrices = JSON.parse(localStorage.getItem('unitPrices')) || {};
+
   initIngredientInputs();
   renderSchedule();
   renderHistory();
