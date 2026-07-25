@@ -3,173 +3,146 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>献立・買い物リスト</title>
-  <link rel="stylesheet" href="style.css">
+  <title>献立・お買い物リスト</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
   <meta name="theme-color" content="#4CAF50">
-  <link rel="apple-touch-icon" href="icon.png">
-  <meta name="apple-mobile-web-app-title" content="もえもえリストあぷり">
 </head>
 <body>
 
-  <!-- stock.htmlへの移動リンク -->
-  <div style="margin: 12px 16px 0 16px;">
-    <a href="stock.html" style="display: block; text-align: center; background-color: #2e7d32; color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.95rem;">
-      📅 献立スケジュール＆在庫管理へ ➔
-    </a>
-  </div>
-
-  <!-- メインタブボタン -->
-  <div class="tab-menu">
+  <!-- タブ切り替えボタン -->
+  <div class="tab-bar">
     <button id="tabBtn1" class="tab-btn active" onclick="switchTab('tab1')">🛒 買い物</button>
     <button id="tabBtn2" class="tab-btn" onclick="switchTab('tab2')">🥦 食材登録</button>
     <button id="tabBtn3" class="tab-btn" onclick="switchTab('tab3')">📝 献立</button>
   </div>
 
-  <!-- タブ1: 買い物画面 -->
+  <!-- タブ1: 買い物リスト作成 -->
   <div id="tab1" class="tab-content active">
-    <!-- 選択カード（リスト作成後に非表示） -->
-    <section class="card" id="menuSelectCard">
+    
+    <!-- 献立選定画面 -->
+    <div id="menuSelectCard" class="card">
+      <h2>献立・食材を選んでリスト作成</h2>
+      <p class="subtitle">作りたい献立や足りない食材を選んでください</p>
       
-      <!-- 「献立から」と「食材一覧から」のサブ切り替えボタン -->
-      <div class="sub-tab-menu">
-        <button id="subTabMenuBtn" class="sub-tab-btn active" onclick="switchSubTab('menu')">🍳 献立から選ぶ</button>
-        <button id="subTabIngBtn" class="sub-tab-btn" onclick="switchSubTab('ingredient')">🥦 食材一覧から選ぶ</button>
+      <!-- サブタブ切り替え -->
+      <div class="sub-tab-bar" style="display: flex; margin-bottom: 15px; border-bottom: 2px solid #ddd;">
+        <button type="button" id="subTabMenuBtn" class="sub-tab-btn active" onclick="switchSubTab('menu')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; border-bottom: 3px solid #4CAF50; color: #4CAF50;">献立から選ぶ</button>
+        <button type="button" id="subTabIngBtn" class="sub-tab-btn" onclick="switchSubTab('ing')" style="flex: 1; padding: 10px; background: none; border: none; font-weight: bold; cursor: pointer; color: #666;">食材一覧から選ぶ</button>
       </div>
 
-      <!-- 1. 献立選択エリア -->
-      <div id="subTabMenuContent">
-        <div id="menuList"></div>
+      <!-- サブタブ1: 献立一覧 -->
+      <div id="subTabMenuContent" class="sub-tab-content" style="display: block;">
+        <div id="menuList" class="select-list"></div>
       </div>
 
-      <!-- 2. 食材直接選択エリア -->
-      <div id="subTabIngContent" style="display: none;">
-        <div id="selectIngList"></div>
+      <!-- サブタブ2: 食材一覧 -->
+      <div id="subTabIngContent" class="sub-tab-content" style="display: none;">
+        <div id="selectIngList" class="select-list"></div>
       </div>
 
-      <button onclick="generateShoppingList()" class="primary-btn" style="margin-top: 16px;">🛒 買い物リストを作成</button>
-      
-      <!-- 選択中の項目をボタン下にリアルタイム表示するエリア -->
-      <div id="selectedItemsSummary"></div>
+      <!-- 選択中の合計サマリーエリア -->
+      <div id="selectedItemsSummary" class="selected-summary-box" style="margin-top: 15px; background: #f0f7f4; border: 1px solid #c8e6c9; border-radius: 6px; padding: 12px;">
+        <p class="summary-empty">選択中の項目はありません</p>
+      </div>
 
-    </section>
+      <button type="button" onclick="generateShoppingList()" class="primary-btn" style="margin-top: 15px;">お買い物リストを作成する</button>
+    </div>
 
-    <!-- 買い物リストカード（初期状態は非表示） -->
-    <section class="card highlight" id="shoppingListCard" style="display: none;">
-      <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 選ぶ画面に戻る</button>
+    <!-- お買い物リスト画面 -->
+    <div id="shoppingListCard" class="card" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin: 0;">お買い物リスト</h2>
+        <button type="button" onclick="backToMenuSelect()" style="background: #78909c; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">← 選択画面に戻る</button>
+      </div>
+      <p class="subtitle">カゴに入れたらタップ（または左スワイプ）で消せます</p>
       
-      <!-- 直接スケジュール管理へ送信するボタン -->
-      <button type="button" onclick="sendToScheduleApp()" style="background:#2e7d32; color:white; border:none; border-radius:8px; padding:12px 16px; font-weight:bold; cursor:pointer; width:100%; margin-bottom:12px; font-size: 0.95rem;">
-        📅 この献立をスケジュール管理に送信して蓄積 ➔
-      </button>
-      
-      <!-- 金額サマリーエリア -->
-      <div class="price-summary">
-        <div class="price-row-main">
-          🛒 カゴの中（8%税込）: <span id="purchasedTax">0</span> 円
-          <div class="price-sub-text">税抜: <span id="purchasedPrice">0</span> 円</div>
+      <div class="summary-box" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
+          <span>カゴの中 (購入済み):</span>
+          <span><strong><span id="purchasedPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="purchasedTax">0</span>円)</span></span>
         </div>
-        <div class="price-row-sub">
-          <span>予定税込: <span id="totalTax">0</span>円 (<span id="totalPrice">0</span>円)</span>
-          <span>残税込: <span id="remainingTax">0</span>円 (<span id="remainingPrice">0</span>円)</span>
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #555; margin-bottom: 4px;">
+          <span>残り (未購入):</span>
+          <span><strong><span id="remainingPrice">0</span>円</strong> <span style="font-size:0.8em; color:#777;">(税込 <span id="remainingTax">0</span>円)</span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold; color: #2e7d32; border-top: 1px solid #eee; padding-top: 6px; margin-top: 6px;">
+          <span>合計金額:</span>
+          <span><span id="totalPrice">0</span>円 <span style="font-size:0.8em; font-weight:normal; color:#555;">(税込 <span id="totalTax">0</span>円)</span></span>
         </div>
       </div>
 
-      <ul id="shoppingList"></ul>
-    </section>
+      <ul id="shoppingList" class="shopping-list"></ul>
+      
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <a href="stock.html" style="flex: 1; background: #ff9800; color: white; border: none; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block;">📜 食べた履歴（stock）を見る</a>
+      </div>
+    </div>
+
   </div>
 
-  <!-- タブ2: 食材登録画面 -->
+  <!-- タブ2: 食材登録 -->
   <div id="tab2" class="tab-content">
-    <section class="card">
-      <h2>🥦 1件ずつ食材登録</h2>
-      <input type="text" id="masterIngName" placeholder="食材名 (例: にんじん)">
-      <input type="number" id="masterIngPrice" placeholder="価格 (円)">
-      <button onclick="saveMasterIngredient()" class="primary-btn">食材を登録</button>
-    </section>
+    <div class="card">
+      <h2>新しい食材の登録</h2>
+      <p class="subtitle">よく使う食材や単体をあらかじめ登録しておけます</p>
+      <div class="edit-row">
+        <input type="text" id="masterIngName" placeholder="食材名 (例: 豚肉)" style="width: 50%;">
+        <input type="number" id="masterIngPrice" placeholder="価格 (円)" style="width: 35%;">
+      </div>
+      <button type="button" onclick="saveMasterIngredient()" class="primary-btn">食材を登録する</button>
+    </div>
 
-    <section class="card highlight">
-      <h2>📋 テキスト一括貼り付け登録</h2>
-      <p style="font-size: 0.8rem; color: #666; margin-bottom: 8px;">
-        レシート読み取りテキストやメモをそのまま貼り付けてください。<br>
-        例：<code>豚肉 300</code> または <code>人参,100</code>（1行に1食材）
-      </p>
-      <textarea id="bulkIngInput" rows="5" placeholder="豚肉 300&#10;人参 100&#10;玉ねぎ 150"></textarea>
-      <button onclick="saveBulkIngredients()" class="primary-btn">一括で登録する</button>
-    </section>
+    <!-- 一括登録カード -->
+    <div class="card">
+      <h2>🥦 食材の一括登録</h2>
+      <p class="subtitle">メモ帳やAIなどで出力された「食材名 価格」のリストをまとめて貼り付けて登録できます。</p>
+      <textarea id="bulkIngInput" placeholder="例：&#13;&#10;にんじん 120&#13;&#10;玉ねぎ 100&#13;&#10;じゃがいも 150" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; box-sizing: border-box; font-size: 0.95rem;"></textarea>
+      <button type="button" onclick="saveBulkIngredients()" class="primary-btn" style="background: #2e7d32;">まとめて登録する</button>
+    </div>
 
-    <section class="card">
+    <div class="card">
       <h2>登録済み食材一覧</h2>
       <div id="masterIngList"></div>
-    </section>
+    </div>
+
+    <!-- データ共有・バックアップ用パネル -->
+    <div class="card" style="margin-top: 20px; background: #f9f9f9; border: 1px dashed #ccc;">
+      <h3>💾 データ共有・バックアップ</h3>
+      <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">献立や食材データをファイルで保存したり、もらったファイルを読み込んで共有できます。</p>
+      
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" onclick="exportBackupData()" style="flex: 1; min-width: 140px; background: #2196F3; color: white; border: none; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer;">📤 データを書き出す</button>
+        
+        <label style="flex: 1; min-width: 140px; background: #4CAF50; color: white; border-radius: 4px; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; display: inline-block;">
+          📥 データを読み込む
+          <input type="file" id="importFile" accept=".json,.txt" onchange="importBackupData(event)" style="display: none;">
+        </label>
+      </div>
+    </div>
   </div>
 
-  <!-- タブ3: 献立画面 -->
+  <!-- タブ3: 献立登録 -->
   <div id="tab3" class="tab-content">
-    <section class="card">
-      <h2>＋ 新しい献立の登録</h2>
-      <input type="text" id="menuName" placeholder="献立名 (例: カレー)">
+    <div class="card">
+      <h2>献立の登録</h2>
+      <p class="subtitle">献立名と、必要な材料・価格を入力してください</p>
+      <label>献立名</label>
+      <input type="text" id="menuName" placeholder="例: カレーライス">
+      
+      <label style="margin-top: 10px; display: block;">材料と価格</label>
       <div id="ingredientInputs"></div>
-      <button onclick="addIngredientRow()">＋ 材料を追加</button>
-      <button onclick="saveMenu()" class="primary-btn">献立を保存</button>
-    </section>
+      
+      <button type="button" onclick="addIngredientRow()" class="secondary-btn" style="margin-top: 5px;">＋ 材料入力行を追加</button>
+      <button type="button" onclick="saveMenu()" class="primary-btn" style="margin-top: 15px;">献立を保存する</button>
+    </div>
 
-    <section class="card">
-      <h2>登録済み献立一覧（編集・削除）</h2>
+    <div class="card">
+      <h2>登録済み献立の管理</h2>
       <div id="manageMenuList"></div>
-    </section>
+    </div>
   </div>
 
   <script src="app.js"></script>
-  <script>
-    // 選択された献立を stock.html の「今週の予定」へ直接送信する関数
-    function sendToScheduleApp() {
-      // app.js内の関数を使って選択中の献立データを取得
-      const selection = getSelectedItemsData();
-      const selectedMenus = selection.selectedMenus;
-
-      if (!selectedMenus || selectedMenus.length === 0) {
-        alert('送信する献立が選択されていません！リストから献立を選んでください。');
-        return;
-      }
-
-      // stock.htmlと合わせ、今週の予定(currentSchedules)と在庫(stockIngredients)を取得
-      let currentSchedules = JSON.parse(localStorage.getItem('currentSchedules')) || [];
-      let stockIngredients = JSON.parse(localStorage.getItem('stockIngredients')) || {};
-
-      // 選択された献立を「今週の予定」に追加
-      selectedMenus.forEach(item => {
-        const menuObj = menus.find(m => m.id === item.id);
-        if (!menuObj) return;
-
-        // 数量（qty）の分だけ予定リストに展開して追加
-        for (let i = 0; i < (item.qty || 1); i++) {
-          currentSchedules.push({
-            id: Date.now() + Math.random(),
-            name: menuObj.name,
-            day: '未定', // デフォルトの曜日
-            time: '昼',  // デフォルトの時間
-            ingredients: menuObj.ingredients ? menuObj.ingredients.map(ing => ing.name) : []
-          });
-        }
-
-        // 食材在庫リストにも自動追加
-        if (menuObj.ingredients) {
-          menuObj.ingredients.forEach(ing => {
-            if (ing.name && stockIngredients[ing.name] === undefined) {
-              stockIngredients[ing.name] = 1; // 初期値1
-            }
-          });
-        }
-      });
-
-      // 正しいキー名（currentSchedules）でローカルストレージに保存
-      localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
-      localStorage.setItem('stockIngredients', JSON.stringify(stockIngredients));
-
-      // stock.htmlへ移動
-      window.location.href = 'stock.html';
-    }
-  </script>
 </body>
 </html>

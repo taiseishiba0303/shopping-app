@@ -41,12 +41,20 @@ function switchSubTab(type) {
     menuContent.style.display = 'block';
     ingContent.style.display = 'none';
     menuBtn.classList.add('active');
+    menuBtn.style.color = '#4CAF50';
+    menuBtn.style.borderBottom = '3px solid #4CAF50';
     ingBtn.classList.remove('active');
+    ingBtn.style.color = '#666';
+    ingBtn.style.borderBottom = 'none';
   } else {
     menuContent.style.display = 'none';
     ingContent.style.display = 'block';
     menuBtn.classList.remove('active');
+    menuBtn.style.color = '#666';
+    menuBtn.style.borderBottom = 'none';
     ingBtn.classList.add('active');
+    ingBtn.style.color = '#4CAF50';
+    ingBtn.style.borderBottom = '3px solid #4CAF50';
   }
 }
 
@@ -126,7 +134,7 @@ function renderMenus() {
   if (!list) return;
   list.innerHTML = '';
   if (menus.length === 0) {
-    list.innerHTML = '<p style="color:#666;">登録された献立がありません。「📝 献立」タブから追加してください。</p>';
+    list.innerHTML = '<p style="color:#666; text-align:center; padding: 20px;">登録された献立がありません。<br>「📝 献立」タブから追加してください。</p>';
     return;
   }
 
@@ -164,7 +172,7 @@ function renderSelectableIngredients() {
   container.innerHTML = '';
 
   if (masterIngredients.length === 0) {
-    container.innerHTML = '<p style="color:#666;">登録された食材がありません。「🥦 食材登録」タブから追加してください。</p>';
+    container.innerHTML = '<p style="color:#666; text-align:center; padding: 20px;">登録された食材がありません。<br>「🥦 食材登録」タブから追加してください。</p>';
     return;
   }
 
@@ -301,7 +309,7 @@ function updateSelectionSummary() {
   const items = getConsolidatedIngredients();
 
   if (items.length === 0) {
-    container.innerHTML = '<p class="summary-empty">選択中の項目はありません</p>';
+    container.innerHTML = '<p class="summary-empty" style="color:#777; margin:0; font-size:0.9rem;">選択中の項目はありません</p>';
     return;
   }
 
@@ -312,10 +320,10 @@ function updateSelectionSummary() {
 
   const taxPrice = Math.floor(totalPrice * 1.08);
 
-  let html = `<div class="summary-header">🛒 選択中: ${items.length}種類 (税込 ${taxPrice.toLocaleString()}円 / 税抜 ${totalPrice.toLocaleString()}円)</div><ul class="summary-list">`;
+  let html = `<div style="font-weight: bold; color: #2e7d32; margin-bottom: 6px; font-size: 0.95rem;">🛒 選択中: ${items.length}種類 (税込 ${taxPrice.toLocaleString()}円 / 税抜 ${totalPrice.toLocaleString()}円)</div><ul style="margin: 0; padding-left: 15px; font-size: 0.9rem; color: #444;">`;
   items.forEach(item => {
-    const countText = item.count > 1 ? ` (${item.count})` : '';
-    html += `<li><span>• ${item.name}${countText}</span><span>${item.price}円</span></li>`;
+    const countText = item.count > 1 ? ` (×${item.count})` : '';
+    html += `<li style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>• ${item.name}${countText}</span><span>${item.price}円</span></li>`;
   });
   html += '</ul>';
 
@@ -347,7 +355,7 @@ function addShoppingListItem(name, price, count) {
   const li = document.createElement('li');
   li.setAttribute('data-price', price || 0);
 
-  const displayName = count > 1 ? `${name} (${count})` : name;
+  const displayName = count > 1 ? `${name} (×${count})` : name;
   li.innerHTML = `<span>${displayName}</span><span>${price}円</span>`;
   
   let startX = 0;
@@ -355,7 +363,7 @@ function addShoppingListItem(name, price, count) {
   let isDragging = false;
   let hasMoved = false;
 
-  // --- タッチ操作（スマホ用） ---
+  // タッチ操作（スマホ用）
   li.addEventListener('touchstart', (e) => {
     startX = e.touches[0].clientX;
     currentX = startX;
@@ -407,9 +415,8 @@ function addShoppingListItem(name, price, count) {
     currentX = 0;
   });
 
-  // --- マウス操作（PC用：1回のクリックで即座に反応するように修正） ---
+  // マウス操作（PC用）
   li.addEventListener('click', (e) => {
-    // ドラッグ（スワイプ）して動かした場合はクリックによる切替を発火させない
     if (hasMoved) return;
     li.classList.toggle('purchased');
     updateShoppingTotals();
@@ -524,10 +531,10 @@ function renderManageMenus() {
     let ingHtml = '';
     menu.ingredients.forEach((ing, ingIndex) => {
       ingHtml += `
-        <div class="edit-row" style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center;">
-          <input type="text" value="${ing.name}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'name', this.value)" style="flex: 1; min-width: 0;">
-          <input type="number" value="${ing.price}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'price', this.value)" style="width: 65px; flex-shrink: 0;"> 円
-          <button type="button" onclick="deleteIngredientFromMenu(${menuIndex}, ${ingIndex})" style="width: 28px; height: 28px; min-width: 28px; flex-shrink: 0; background: #ff7043; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;">×</button>
+        <div class="edit-row">
+          <input type="text" value="${ing.name}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'name', this.value)" style="flex: 1; margin-bottom: 0;">
+          <input type="number" value="${ing.price}" onchange="updateIngredient(${menuIndex}, ${ingIndex}, 'price', this.value)" style="width: 70px; margin-bottom: 0;"> 円
+          <button type="button" onclick="deleteIngredientFromMenu(${menuIndex}, ${ingIndex})" class="danger-btn" style="padding: 6px 10px; margin: 0;">×</button>
         </div>
       `;
     });
@@ -537,8 +544,8 @@ function renderManageMenus() {
       <input type="text" value="${menu.name}" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 8px;" onchange="updateMenuName(${menuIndex}, this.value)">
       <label style="font-size: 0.8rem; color: #666;">材料・価格:</label>
       ${ingHtml}
-      <button type="button" onclick="addIngredientToMenu(${menuIndex})" style="background: #e8f5e9; color: #2e7d32; border: 1px solid #4CAF50; border-radius: 4px; padding: 6px 12px; margin: 6px 0 12px 0; cursor: pointer; width: 100%; font-weight: bold;">＋ 材料を追加</button>
-      <button class="danger-btn" onclick="deleteMenu(${menuIndex})">この献立を削除</button>
+      <button type="button" onclick="addIngredientToMenu(${menuIndex})" class="secondary-btn" style="margin: 6px 0 12px 0;">＋ 材料を追加</button>
+      <button type="button" class="danger-btn" onclick="deleteMenu(${menuIndex})" style="width: 100%;">この献立を削除</button>
     `;
     container.appendChild(div);
   });
@@ -666,10 +673,10 @@ function renderMasterIngredients() {
     div.className = 'master-item';
     div.innerHTML = `
       <div class="edit-row" style="flex: 1; margin-bottom: 0;">
-        <input type="text" value="${item.name}" onchange="updateMasterIngredient(${index}, 'name', this.value)" style="width: 50%;">
-        <input type="number" value="${item.price}" onchange="updateMasterIngredient(${index}, 'price', this.value)" style="width: 35%;"> 円
+        <input type="text" value="${item.name}" onchange="updateMasterIngredient(${index}, 'name', this.value)" style="width: 50%; margin-bottom: 0;">
+        <input type="number" value="${item.price}" onchange="updateMasterIngredient(${index}, 'price', this.value)" style="width: 35%; margin-bottom: 0;"> 円
       </div>
-      <button class="danger-btn" onclick="deleteMasterIngredient(${index})" style="width: auto; padding: 6px 10px; margin: 0 0 0 8px; font-size: 0.8rem;">削除</button>
+      <button type="button" class="danger-btn" onclick="deleteMasterIngredient(${index})" style="width: auto; padding: 6px 10px; margin: 0 0 0 8px; font-size: 0.8rem;">削除</button>
     `;
     container.appendChild(div);
   });
@@ -750,4 +757,64 @@ function exportMenuTxt() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// --- バックアップ・データ共有（エクスポート・インポート）機能 ---
+function exportBackupData() {
+  const backupData = {
+    menus: menus,
+    masterIngredients: masterIngredients
+  };
+  
+  const jsonString = JSON.stringify(backupData, null, 2);
+  const blob = new Blob([jsonString], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `menu_backup_${today}.txt`;
+  
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importBackupData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const content = e.target.result;
+      const data = JSON.parse(content);
+
+      if (!data.menus || !data.masterIngredients) {
+        return alert('ファイルの形式が正しくないか、献立データが含まれていません。');
+      }
+
+      if (confirm(`読み込んだファイルから以下のデータを復元します。\n・献立: ${data.menus.length}件\n・食材: ${data.masterIngredients.length}件\n\n※現在のデータに上書き・追加されます。よろしいですか？`)) {
+        menus = data.menus;
+        masterIngredients = data.masterIngredients;
+
+        localStorage.setItem('menus', JSON.stringify(menus));
+        localStorage.setItem('masterIngredients', JSON.stringify(masterIngredients));
+
+        sortMasterIngredients();
+        renderMenus();
+        renderMasterIngredients();
+        renderSelectableIngredients();
+        updateSelectionSummary();
+        renderManageMenus();
+
+        alert('データの読み込みが完了しました！');
+      }
+    } catch (err) {
+      alert('ファイルの読み込みに失敗しました。正しいバックアップファイル（TXT）を選択してください。');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
