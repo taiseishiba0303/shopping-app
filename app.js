@@ -24,7 +24,6 @@ let editingEatOutIndex = null;
 let editingMenuIndex = null;
 let activeScheduleTarget = null;
 
-// データを更新した瞬間に絶対にLocalStorageへ自動同期する鉄壁の保存ラッパー
 function persistAllData() {
   try {
     localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
@@ -40,14 +39,10 @@ function persistAllData() {
   }
 }
 
-// ページを離れる・リロードされる瞬間に全データを強制保存
 window.addEventListener('beforeunload', persistAllData);
 window.addEventListener('pagehide', persistAllData);
 
 function switchTab(tabId) {
-  // タブ切り替え前に必ず現在のスケジュール入力を回収して保存
-  syncScheduleInputsToMemory();
-
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
@@ -67,21 +62,6 @@ function switchTab(tabId) {
   } else if (tabId === 'tab5') {
     renderStock();
   }
-}
-
-// 画面上にあるスケジュール入力欄の値を確実にメモリ（currentSchedules）へ取り込む
-function syncScheduleInputsToMemory() {
-  fixedScheduleKeys.forEach((keyObj, index) => {
-    const keyStr = `${keyObj.day}_${keyObj.time}`;
-    const inputEl = document.getElementById(`sched-input-${index}`);
-    if (inputEl) {
-      if (!currentSchedules[keyStr]) {
-        currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
-      }
-      currentSchedules[keyStr].name = inputEl.value.trim();
-    }
-  });
-  persistAllData();
 }
 
 function switchDbSubTab(sub) {
@@ -212,8 +192,6 @@ function updateSummary() {
 }
 
 function generateShoppingListFromSchedule() {
-  syncScheduleInputsToMemory();
-
   let rawItems = [];
   fixedScheduleKeys.forEach(keyObj => {
     const keyStr = `${keyObj.day}_${keyObj.time}`;
@@ -871,9 +849,7 @@ function getMenuPrice(menuName) {
   return 0;
 }
 
-// 確実なポップアップ選択式
 function openSchedulePicker(day, time, index) {
-  syncScheduleInputsToMemory(); // 開く前に現在の入力を同期保存
   activeScheduleTarget = { day, time, index };
   const modal = document.getElementById('schedulePickerModal');
   if (!modal) {
@@ -1036,7 +1012,6 @@ function renderSchedule() {
 }
 
 function toggleSchedulePrice(day, time) {
-  syncScheduleInputsToMemory();
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
@@ -1054,7 +1029,6 @@ function resetAllSchedules() {
 }
 
 function toggleCompleteSchedule(day, time, index) {
-  syncScheduleInputsToMemory();
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   const item = currentSchedules[keyStr];
