@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>献立・買い物リスト</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4CAF50">
+</head>
+<body>
+
+  <!-- タブボタン -->
+  <div class="tab-menu">
+    <button id="tabBtn1" class="tab-btn active" onclick="switchTab('tab1')">🛒 買い物</button>
+    <button id="tabBtn2" class="tab-btn" onclick="switchTab('tab2')">🥦 食材登録</button>
+    <button id="tabBtn3" class="tab-btn" onclick="switchTab('tab3')">📝 献立</button>
+  </div>
+
+  <!-- タブ1: 買い物画面 -->
+  <div id="tab1" class="tab-content active">
+    <!-- 献立選択カード（リスト作成後に非表示） -->
+    <section class="card" id="menuSelectCard">
+      <h2>献立を選ぶ</h2>
+      <div id="menuList"></div>
+      <button onclick="generateShoppingList()" class="primary-btn">🛒 買い物リストを作成</button>
+    </section>
+
+    <!-- 買い物リストカード（初期状態は非表示） -->
+    <section class="card highlight" id="shoppingListCard" style="display: none;">
+      <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 献立を選び直す</button>
+      
+      <!-- 金額サマリーエリア -->
+      <div class="price-summary">
+        <div class="price-row-main">
+          🛒 カゴの中（購入済み）: <span id="purchasedPrice">0</span> 円
+        </div>
+        <div class="price-row-sub">
+          <span>予定合計: <span id="totalPrice">0</span> 円</span>
+          <span>残り: <span id="remainingPrice">0</span> 円</span>
+        </div>
+      </div>
+
+      <ul id="shoppingList"></ul>
+    </section>
+  </div>
+
+  <!-- タブ2: 食材登録画面 -->
+  <div id="tab2" class="tab-content">
+    <section class="card">
+      <h2>🥦 1件ずつ食材登録</h2>
+      <input type="text" id="masterIngName" placeholder="食材名 (例: にんじん)">
+      <input type="number" id="masterIngPrice" placeholder="価格 (円)">
+      <button onclick="saveMasterIngredient()" class="primary-btn">食材を登録</button>
+    </section>
+
+    <section class="card highlight">
+      <h2>📋 テキスト一括貼り付け登録</h2>
+      <p style="font-size: 0.8rem; color: #666; margin-bottom: 8px;">
+        レシート読み取りテキストやメモをそのまま貼り付けてください。<br>
+        例：<code>豚肉 300</code> または <code>人参,100</code>（1行に1食材）
+      </p>
+      <textarea id="bulkIngInput" rows="5" placeholder="豚肉 300&#10;人参 100&#10;玉ねぎ 150"></textarea>
+      <button onclick="saveBulkIngredients()" class="primary-btn">一括で登録する</button>
+    </section>
+
+    <section class="card">
+      <h2>登録済み食材一覧</h2>
+      <div id="masterIngList"></div>
+    </section>
+  </div>
+
+  <!-- タブ3: 献立（作成と管理を統合） -->
+  <div id="tab3" class="tab-content">
+    <section class="card">
+      <h2>＋ 新しい献立の登録</h2>
+      <input type="text" id="menuName" placeholder="献立名 (例: カレー)">
+      <div id="ingredientInputs"></div>
+      <button onclick="addIngredientRow()">＋ 材料を追加</button>
+      <button onclick="saveMenu()" class="primary-btn">献立を保存</button>
+    </section>
+
+    <section class="card">
+      <h2>登録済み献立一覧（編集・削除）</h2>
+      <div id="manageMenuList"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
