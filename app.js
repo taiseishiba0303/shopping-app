@@ -23,26 +23,46 @@ let editingMasterIndex = null;
 let editingEatOutIndex = null;
 let editingMenuIndex = null;
 
-// ★ 予定データを完全に即時・同期してストレージへ書き込む強固な保存関数
-function saveSchedulesToStorage() {
+// 現在編集中（未保存）のスケジュール入力内容を保持する一時オブジェクト
+let tempScheduleInputs = {};
+
+// 予定タブ専用の「明示的な保存ボタン」で実行される核心の保存処理
+function saveSchedulesExplicitly() {
+  // 画面上の全入力ボックスから最新の値を確実に回収
+  fixedScheduleKeys.forEach((keyObj, index) => {
+    const keyStr = `${keyObj.day}_${keyObj.time}`;
+    const inputEl = document.getElementById(`sched-input-${index}`);
+    if (inputEl) {
+      if (!currentSchedules[keyStr]) {
+        currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
+      }
+      currentSchedules[keyStr].name = inputEl.value.trim();
+    }
+  });
+
   try {
     localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+    alert('今週の献立スケジュールを保存しました！');
+    renderSchedule();
   } catch (e) {
     console.error('Storage save error:', e);
+    alert('保存に失敗しました。容量やブラウザ設定をご確認ください。');
   }
 }
 
-// ページ離脱やリロード、バックグラウンド移行時に強制保存
-window.addEventListener('pagehide', saveSchedulesToStorage);
-window.addEventListener('beforeunload', saveSchedulesToStorage);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
-    saveSchedulesToStorage();
-  }
+// ページ離脱時などの安全ガード
+window.addEventListener('beforeunload', () => {
+  fixedScheduleKeys.forEach((keyObj, index) => {
+    const keyStr = `${keyObj.day}_${keyObj.time}`;
+    const inputEl = document.getElementById(`sched-input-${index}`);
+    if (inputEl && currentSchedules[keyStr]) {
+      currentSchedules[keyStr].name = inputEl.value.trim();
+    }
+  });
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
 });
 
 function switchTab(tabId) {
-  saveSchedulesToStorage();
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
@@ -192,6 +212,15 @@ function updateSummary() {
 }
 
 function generateShoppingListFromSchedule() {
+  // 読み込み前に現在の入力も反映させる
+  fixedScheduleKeys.forEach((keyObj, index) => {
+    const keyStr = `${keyObj.day}_${keyObj.time}`;
+    const inputEl = document.getElementById(`sched-input-${index}`);
+    if (inputEl && currentSchedules[keyStr]) {
+      currentSchedules[keyStr].name = inputEl.value.trim();
+    }
+  });
+
   let rawItems = [];
   fixedScheduleKeys.forEach(keyObj => {
     const keyStr = `${keyObj.day}_${keyObj.time}`;
@@ -231,6 +260,7 @@ function generateShoppingListFromSchedule() {
   localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
   localStorage.setItem('unitPrices', JSON.stringify(unitPrices));
   renderShoppingListView();
+  alert('予定から買い物リストを生成しました！');
 }
 
 function addSelectedItemsToShoppingList() {
@@ -860,6 +890,121 @@ function getMenuPrice(menuName) {
   return 0;
 }
 
+// ==========================================
+// ★ 解決策：確実な「ポップアップ選択式」によるスケジュール入力
+// ==========================================
+let activeScheduleTarget = null; // { day, time, index }
+
+function openSchedulePicker(day, time, index) {
+  activeScheduleTarget = { day, time, index };
+  const modal = document.getElementById('schedulePickerModal');
+  if (!modal) {
+    // モーダル要素がHTMLに無い場合は動的に作成してDOMに挿入する
+    createSchedulePickerModalDOM();
+  }
+  renderSchedulePickerContent();
+  document.getElementById('schedulePickerModal').style.display = 'flex';
+}
+
+function createSchedulePickerModalDOM() {
+  const modalDiv = document.createElement('div');
+  modalDiv.id = 'schedulePickerModal';
+  modalDiv.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;';
+  modalDiv.innerHTML = `
+    <div style="background:white; width:90%; max-width:400px; max-height:80vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+      <div style="padding:15px; background:#4CAF50; color:white; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
+        <span id="pickerTitle">献立・外食を選択</span>
+        <button type="button" onclick="closeSchedulePicker()" style="background:none; border:none; color:white; font-size:1.2rem; cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:10px; border-bottom:1px solid #eee;">
+        <input type="text" id="pickerCustomInput" placeholder="直接手入力も可能..." style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;">
+        <button type="button" onclick="selectCustomPickerValue()" style="width:100%; margin-top:6px; background:#2e7d32; color:white; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">この内容で決定</button>
+      </div>
+      <div id="pickerListContent" style="padding:10px; overflow-y:auto; flex:1;"></div>
+      <div style="padding:10px; background:#f5f5f5; text-align:right;">
+        <button type="button" onclick="clearSchedulePickerValue()" style="background:#d32f2f; color:white; border:none; padding:8px 12px; border-radius:4px; font-weight:bold; cursor:pointer; margin-right:auto;">空欄にする(クリア)</button>
+        <button type="button" onclick="closeSchedulePicker()" style="background:#ccc; color:#333; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalDiv);
+}
+
+function renderSchedulePickerContent() {
+  const container = document.getElementById('pickerListContent');
+  const titleEl = document.getElementById('pickerTitle');
+  if (!container || !activeScheduleTarget) return;
+
+  titleEl.textContent = `${activeScheduleTarget.day}曜(${activeScheduleTarget.time}) の選択`;
+  
+  let html = '<div style="font-weight:bold; color:#2e7d32; margin-bottom:5px; font-size:0.9rem;">【登録済み献立】</div>';
+  if (menus.length === 0) {
+    html += '<p style="color:#888; font-size:0.85rem; margin-bottom:10px;">登録献立がありません</p>';
+  } else {
+    html += menus.map(m => `
+      <div onclick="applySchedulePickerValue('${m.name.replace(/'/g, "\\'")}')" style="padding:10px; margin-bottom:4px; background:#f9f9f9; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span>${m.name}</span>
+        <span style="font-size:0.8rem; color:#2e7d32;">選択 ▶</span>
+      </div>
+    `).join('');
+  }
+
+  html += '<div style="font-weight:bold; color:#e65100; margin:15px 0 5px 0; font-size:0.9rem;">【外食・お店】</div>';
+  if (eatOutStores.length === 0) {
+    html += '<p style="color:#888; font-size:0.85rem;">登録外食店舗がありません</p>';
+  } else {
+    html += eatOutStores.map(s => `
+      <div onclick="applySchedulePickerValue('${s.name.replace(/'/g, "\\'")}')" style="padding:10px; margin-bottom:4px; background:#fff8e1; border:1px solid #ffe0b2; border-radius:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:#e65100; font-weight:bold;">${s.name}</span>
+        <span style="font-size:0.8rem; color:#e65100;">選択 ▶</span>
+      </div>
+    `).join('');
+  }
+
+  container.innerHTML = html;
+  const customInput = document.getElementById('pickerCustomInput');
+  if (customInput) customInput.value = '';
+}
+
+function applySchedulePickerValue(name) {
+  if (!activeScheduleTarget) return;
+  const { day, time, index } = activeScheduleTarget;
+  const keyStr = `${day}_${time}`;
+  
+  if (!currentSchedules[keyStr]) {
+    currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
+  }
+  currentSchedules[keyStr].name = name;
+
+  // すぐに反映＆即時保存
+  renderSchedule();
+  closeSchedulePicker();
+}
+
+function selectCustomPickerValue() {
+  const customInput = document.getElementById('pickerCustomInput');
+  if (!customInput || !activeScheduleTarget) return;
+  const val = customInput.value.trim();
+  applySchedulePickerValue(val);
+}
+
+function clearSchedulePickerValue() {
+  if (!activeScheduleTarget) return;
+  const { day, time } = activeScheduleTarget;
+  const keyStr = `${day}_${time}`;
+  if (currentSchedules[keyStr]) {
+    currentSchedules[keyStr].name = '';
+  }
+  renderSchedule();
+  closeSchedulePicker();
+}
+
+function closeSchedulePicker() {
+  const modal = document.getElementById('schedulePickerModal');
+  if (modal) modal.style.display = 'none';
+  activeScheduleTarget = null;
+}
+
 function renderSchedule() {
   const container = document.getElementById('currentScheduleTableBody');
   if (!container) return;
@@ -891,9 +1036,9 @@ function renderSchedule() {
       <tr class="schedule-row ${data.completed ? 'completed' : ''}" id="sched-row-${index}">
         <td style="font-weight: bold; color: ${dayColor};">${keyObj.day}(${keyObj.time})</td>
         <td>
-          <div class="schedule-input-container">
-            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onblur="onScheduleBlur('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
-            <div class="suggest-box" id="suggest-box-${index}"></div>
+          <div class="schedule-input-container" style="display:flex; gap:4px; align-items:center;">
+            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="タップして選択..." style="flex:1;" readonly onclick="openSchedulePicker('${keyObj.day}', '${keyObj.time}', ${index})">
+            <button type="button" onclick="openSchedulePicker('${keyObj.day}', '${keyObj.time}', ${index})" style="background:#e0e0e0; border:none; padding:4px 8px; border-radius:4px; font-size:0.8rem; cursor:pointer;">選択</button>
           </div>
         </td>
         <td style="text-align: right; font-weight: bold; cursor: pointer; color: ${basePrice > 0 && !data.excludePrice ? '#2e7d32' : '#888'};" onclick="toggleSchedulePrice('${keyObj.day}', '${keyObj.time}')" title="タッチして金額の含める/除外を切り替え">
@@ -917,7 +1062,7 @@ function toggleSchedulePrice(day, time) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].excludePrice = !currentSchedules[keyStr].excludePrice;
-  saveSchedulesToStorage();
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
   renderSchedule();
 }
 
@@ -929,130 +1074,14 @@ function resetAllSchedules() {
   }
 }
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.schedule-input-container')) {
-    document.querySelectorAll('.suggest-box').forEach(box => box.style.display = 'none');
-  }
-});
-
-function toHiragana(str) {
-  return str.replace(/[\u30a1-\u30f6]/g, match => {
-    return String.fromCharCode(match.charCodeAt(0) - 0x60);
-  });
-}
-
-function onScheduleInput(day, time, index) {
-  const inputEl = document.getElementById(`sched-input-${index}`);
-  const suggestBox = document.getElementById(`suggest-box-${index}`);
-  if (!inputEl) return;
-  const val = inputEl.value;
-
-  const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
-  
-  currentSchedules[keyStr].name = val;
-  saveSchedulesToStorage(); // 入力の都度、即座にストレージへ直書き
-
-  if (isEatOutItem(val)) {
-    inputEl.classList.add('is-eatout');
-  } else {
-    inputEl.classList.remove('is-eatout');
-  }
-
-  let totalScheduleSum = 0;
-  fixedScheduleKeys.forEach((kObj) => {
-    const kStr = `${kObj.day}_${kObj.time}`;
-    const d = currentSchedules[kStr] || { name: '', completed: false, excludePrice: false };
-    const p = getMenuPrice(d.name);
-    if (!d.excludePrice) totalScheduleSum += p;
-  });
-  
-  const totalPriceEl = document.getElementById('totalSchedulePrice');
-  if (totalPriceEl) {
-    totalPriceEl.textContent = totalScheduleSum.toLocaleString();
-  }
-  
-  const priceCell = document.querySelector(`#sched-row-${index} td:nth-child(3)`);
-  const currentPrice = getMenuPrice(val);
-  const isExcluded = currentSchedules[keyStr].excludePrice;
-  
-  if (priceCell) {
-    if (currentPrice > 0) {
-      priceCell.innerHTML = isExcluded 
-        ? `<span style="text-decoration: line-through; color: #ccc;">${currentPrice.toLocaleString()}円</span> <span style="font-size:0.75rem; color:#999;">(除外)</span>` 
-        : currentPrice.toLocaleString() + '円';
-      priceCell.style.color = isExcluded ? '#888' : '#2e7d32';
-    } else {
-      priceCell.textContent = '-';
-      priceCell.style.color = '#888';
-    }
-  }
-
-  if (!suggestBox) return;
-  const trimmedVal = val.trim();
-  let candidates = [];
-  menus.forEach(m => candidates.push(m.name));
-  eatOutStores.forEach(s => candidates.push(s.name));
-
-  const normalizedVal = toHiragana(trimmedVal).toLowerCase();
-
-  const matches = trimmedVal === '' 
-    ? candidates 
-    : candidates.filter(name => {
-        const normalizedName = toHiragana(name).toLowerCase();
-        return normalizedName.includes(normalizedVal);
-      });
-
-  if (matches.length > 0) {
-    suggestBox.innerHTML = matches.map(name => `
-      <div class="suggest-item" data-day="${day}" data-time="${time}" data-index="${index}" data-name="${name.replace(/"/g, '&quot;')}">${name}</div>
-    `).join('');
-    
-    suggestBox.querySelectorAll('.suggest-item').forEach(item => {
-      const handleSelect = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const d = item.getAttribute('data-day');
-        const t = item.getAttribute('data-time');
-        const idx = item.getAttribute('data-index');
-        const mName = item.getAttribute('data-name');
-        selectSuggest(d, t, idx, mName);
-      };
-      item.addEventListener('mousedown', handleSelect);
-      item.addEventListener('touchstart', handleSelect, { passive: false });
-    });
-
-    suggestBox.style.display = 'block';
-  } else {
-    suggestBox.style.display = 'none';
-  }
-}
-
-function onScheduleBlur(day, time, index) {
-  const inputEl = document.getElementById(`sched-input-${index}`);
-  if (!inputEl) return;
-  const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
-  currentSchedules[keyStr].name = inputEl.value;
-  saveSchedulesToStorage(); // フォーカス外れた時にも確実に保存
-}
-
-function selectSuggest(day, time, index, menuName) {
-  const inputEl = document.getElementById(`sched-input-${index}`);
-  if (inputEl) inputEl.value = menuName;
-  const box = document.getElementById(`suggest-box-${index}`);
-  if (box) box.style.display = 'none';
-
-  const keyStr = `${day}_${time}`;
-  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
-  currentSchedules[keyStr].name = menuName;
-  
-  saveSchedulesToStorage(); // 候補選択時に即座に保存
-  renderSchedule();
-}
-
 function toggleCompleteSchedule(day, time, index) {
   const keyStr = `${day}_${time}`;
+  // 入力欄の内容も確実に同期
+  const inputEl = document.getElementById(`sched-input-${index}`);
+  if (inputEl && currentSchedules[keyStr]) {
+    currentSchedules[keyStr].name = inputEl.value.trim();
+  }
+
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   const item = currentSchedules[keyStr];
   if (!item.name || item.name.trim() === '') return;
@@ -1096,7 +1125,7 @@ function toggleCompleteSchedule(day, time, index) {
     }
   }
 
-  saveSchedulesToStorage();
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
   renderSchedule();
   renderHistory();
 }
