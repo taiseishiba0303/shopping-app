@@ -29,6 +29,31 @@ body {
 .tab-content.active {
   display: block;
 }
+
+/* サブ切り替えボタン */
+.sub-tab-menu {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+.sub-tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin: 0;
+}
+.sub-tab-btn.active {
+  background: #81c784;
+  color: white;
+}
+
 .card {
   background: white;
   padding: 16px;
@@ -68,9 +93,7 @@ button.secondary-btn { background: #757575; color: white; }
 button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
 .menu-item { display: block; margin: 8px 0; font-size: 1.1rem; }
 
-/* ------------------------------------
- * 金額表示エリア（8%税込対応）
- * ------------------------------------ */
+/* 金額表示エリア */
 .price-summary {
   background: #ffffff;
   padding: 12px;
@@ -117,11 +140,8 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   padding: 8px 0;
   border-bottom: 1px solid #eee;
 }
-.master-item button { width: auto; padding: 6px 12px; margin: 0; font-size: 0.8rem; }
 
-/* ------------------------------------
- * 買い物リストデザイン
- * ------------------------------------ */
+/* 買い物リスト */
 #shoppingList {
   list-style: none;
   padding: 0;
@@ -153,4 +173,60 @@ button.danger-btn { background: #ff5252; color: white; margin-top: 8px; }
   border-color: #dddddd;
   box-shadow: none;
   opacity: 0.6;
+}
+
+/* 選択中項目のプレビュー表示用スタイル */
+#selectedItemsSummary {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.summary-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #888;
+  text-align: center;
+}
+
+.summary-header {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #2e7d32;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 4px;
+}
+
+.summary-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.summary-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #555;
+  padding: 3px 0;
+}
+/* ボタンのCSS */
+.button {
+  /* ▼ここからが真ん中に寄せる設定▼ */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  line-height: 1; /* 余計な隙間をなくす */
+  padding: 0;     /* ブラウザ固有のズレをなくす */
+  /* ▲ここまで▲ */
+
+  /* 以下はご自身のボタンのサイズや色に合わせて調整してください */
+  width: 40px;
+  height: 40px;
+  border-radius: 50%; /* 丸くする */
 }

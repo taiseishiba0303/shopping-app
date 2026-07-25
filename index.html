@@ -7,10 +7,12 @@
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#4CAF50">
+  <link rel="apple-touch-icon" href="icon.png">
+  <meta name="apple-mobile-web-app-title" content="もえもえリストあぷり">
 </head>
 <body>
 
-  <!-- タブボタン -->
+  <!-- メインタブボタン -->
   <div class="tab-menu">
     <button id="tabBtn1" class="tab-btn active" onclick="switchTab('tab1')">🛒 買い物</button>
     <button id="tabBtn2" class="tab-btn" onclick="switchTab('tab2')">🥦 食材登録</button>
@@ -19,18 +21,37 @@
 
   <!-- タブ1: 買い物画面 -->
   <div id="tab1" class="tab-content active">
-    <!-- 献立選択カード -->
+    <!-- 選択カード（リスト作成後に非表示） -->
     <section class="card" id="menuSelectCard">
-      <h2>献立を選ぶ</h2>
-      <div id="menuList"></div>
-      <button onclick="generateShoppingList()" class="primary-btn">🛒 買い物リストを作成</button>
+      
+      <!-- 「献立から」と「食材一覧から」のサブ切り替えボタン -->
+      <div class="sub-tab-menu">
+        <button id="subTabMenuBtn" class="sub-tab-btn active" onclick="switchSubTab('menu')">🍳 献立から選ぶ</button>
+        <button id="subTabIngBtn" class="sub-tab-btn" onclick="switchSubTab('ingredient')">🥦 食材一覧から選ぶ</button>
+      </div>
+
+      <!-- 1. 献立選択エリア -->
+      <div id="subTabMenuContent">
+        <div id="menuList"></div>
+      </div>
+
+      <!-- 2. 食材直接選択エリア -->
+      <div id="subTabIngContent" style="display: none;">
+        <div id="selectIngList"></div>
+      </div>
+
+      <button onclick="generateShoppingList()" class="primary-btn" style="margin-top: 16px;">🛒 買い物リストを作成</button>
+      
+      <!-- 選択中の項目をボタン下にリアルタイム表示するエリア -->
+      <div id="selectedItemsSummary"></div>
+
     </section>
 
-    <!-- 買い物リストカード -->
+    <!-- 買い物リストカード（初期状態は非表示） -->
     <section class="card highlight" id="shoppingListCard" style="display: none;">
-      <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 献立を選び直す</button>
+      <button onclick="backToMenuSelect()" class="secondary-btn" style="margin-top: 0; margin-bottom: 12px;">🔙 選ぶ画面に戻る</button>
       
-      <!-- 金額サマリーエリア（税込み対応） -->
+      <!-- 金額サマリーエリア -->
       <div class="price-summary">
         <div class="price-row-main">
           🛒 カゴの中（8%税込）: <span id="purchasedTax">0</span> 円
