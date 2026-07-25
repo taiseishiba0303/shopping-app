@@ -353,12 +353,14 @@ function addShoppingListItem(name, price, count) {
   let startX = 0;
   let currentX = 0;
   let isDragging = false;
+  let hasMoved = false;
 
   // --- タッチ操作（スマホ） ---
   li.addEventListener('touchstart', (e) => {
     startX = e.touches[0].clientX;
     currentX = startX;
     isDragging = true;
+    hasMoved = false;
     li.style.transition = 'none';
   }, { passive: true });
 
@@ -366,6 +368,10 @@ function addShoppingListItem(name, price, count) {
     if (!isDragging) return;
     currentX = e.touches[0].clientX;
     let diff = currentX - startX;
+
+    if (Math.abs(diff) > 8) {
+      hasMoved = true;
+    }
 
     // 左にスライドしている時だけカードを左にずらす
     if (diff < 0) {
@@ -380,7 +386,7 @@ function addShoppingListItem(name, price, count) {
     let diff = currentX - startX;
     li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
 
-    // 🔴 判定1: -80px以上「左に大きくスライド」した場合は削除
+    // 1. 大きく左にスライドした場合は削除
     if (diff < -80) {
       li.style.transform = 'translateX(-100%)';
       li.style.opacity = '0';
@@ -389,14 +395,14 @@ function addShoppingListItem(name, price, count) {
         updateShoppingTotals();
       }, 200);
     } 
-    // 🟡 判定2: 移動距離がほとんどない（-15px〜15px以内）場合は「タップ」と判定してグレーアウト
-    else if (Math.abs(diff) <= 15) {
+    // 2. ほとんど動かしていない（タップされた）場合はグレーアウトを切り替え
+    else if (!hasMoved || Math.abs(diff) <= 10) {
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
       li.classList.toggle('purchased');
       updateShoppingTotals();
     } 
-    // ⚪ 判定3: 途中で指を離した場合は元の位置に戻す
+    // 3. 中途半端に動かして離した場合は元に戻す
     else {
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
@@ -411,12 +417,16 @@ function addShoppingListItem(name, price, count) {
     startX = e.clientX;
     currentX = startX;
     isDragging = true;
+    hasMoved = false;
     li.style.transition = 'none';
 
     const onMouseMove = (ev) => {
       if (!isDragging) return;
       currentX = ev.clientX;
       let diff = currentX - startX;
+      if (Math.abs(diff) > 8) {
+        hasMoved = true;
+      }
       if (diff < 0) {
         li.style.transform = `translateX(${diff}px)`;
         li.style.opacity = Math.max(1 - Math.abs(diff) / 200, 0.2);
@@ -436,7 +446,7 @@ function addShoppingListItem(name, price, count) {
           li.remove();
           updateShoppingTotals();
         }, 200);
-      } else if (Math.abs(diff) <= 15) {
+      } else if (!hasMoved || Math.abs(diff) <= 10) {
         li.style.transform = 'translateX(0)';
         li.style.opacity = '1';
         li.classList.toggle('purchased');
