@@ -355,7 +355,7 @@ function addShoppingListItem(name, price, count) {
   let isDragging = false;
   let hasMoved = false;
 
-  // --- タッチ操作（スマホ用：ワンタップですぐに反応するように最適化） ---
+  // --- タッチ操作（スマホ用） ---
   li.addEventListener('touchstart', (e) => {
     startX = e.touches[0].clientX;
     currentX = startX;
@@ -385,7 +385,6 @@ function addShoppingListItem(name, price, count) {
     let diff = currentX - startX;
     li.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
 
-    // 1. 大きく左にスライドした場合は削除
     if (diff < -80) {
       li.style.transform = 'translateX(-100%)';
       li.style.opacity = '0';
@@ -393,17 +392,13 @@ function addShoppingListItem(name, price, count) {
         li.remove();
         updateShoppingTotals();
       }, 200);
-    } 
-    // 2. 指をほとんど動かさずに離した（ワンタップ）場合：即座にグレーアウト切替
-    else if (!hasMoved || Math.abs(diff) <= 10) {
-      e.preventDefault(); // スマホ特有の二重クリックやズーム動作を防止
+    } else if (!hasMoved || Math.abs(diff) <= 10) {
+      e.preventDefault();
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
       li.classList.toggle('purchased');
       updateShoppingTotals();
-    } 
-    // 3. 中途半端に戻した場合
-    else {
+    } else {
       li.style.transform = 'translateX(0)';
       li.style.opacity = '1';
     }
@@ -412,15 +407,14 @@ function addShoppingListItem(name, price, count) {
     currentX = 0;
   });
 
-  // --- マウス操作（PCテスト用） ---
+  // --- マウス操作（PC用：1回のクリックで即座に反応するように修正） ---
   li.addEventListener('click', (e) => {
-    // タッチデバイス以外のPCクリック時に確実にトグルさせる
-    if (e.pointerType === 'touch') return; // タッチはtouchend側で処理するため除外
+    // ドラッグ（スワイプ）して動かした場合はクリックによる切替を発火させない
+    if (hasMoved) return;
     li.classList.toggle('purchased');
     updateShoppingTotals();
   });
 
-  // PCでのドラッグ削除用（mousedown）
   li.addEventListener('mousedown', (e) => {
     startX = e.clientX;
     currentX = startX;
@@ -454,11 +448,6 @@ function addShoppingListItem(name, price, count) {
           li.remove();
           updateShoppingTotals();
         }, 200);
-      } else if (!hasMoved) {
-        li.style.transform = 'translateX(0)';
-        li.style.opacity = '1';
-        li.classList.toggle('purchased');
-        updateShoppingTotals();
       } else {
         li.style.transform = 'translateX(0)';
         li.style.opacity = '1';
