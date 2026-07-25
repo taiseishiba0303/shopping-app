@@ -23,7 +23,20 @@ let editingMasterIndex = null;
 let editingEatOutIndex = null;
 let editingMenuIndex = null;
 
+// ★ 確実に即時同期・保存を行う関数
+function saveSchedulesToStorage() {
+  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+}
+
+window.addEventListener('pagehide', saveSchedulesToStorage);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    saveSchedulesToStorage();
+  }
+});
+
 function switchTab(tabId) {
+  saveSchedulesToStorage();
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   
@@ -873,8 +886,8 @@ function renderSchedule() {
         <td style="font-weight: bold; color: ${dayColor};">${keyObj.day}(${keyObj.time})</td>
         <td>
           <div class="schedule-input-container">
-            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onfocus="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
-            <div class="suggest-box" id="suggest-box-${index}" onmousedown="event.preventDefault()"></div>
+            <input type="text" class="${inputClass}" id="sched-input-${index}" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="タップして入力..." oninput="onScheduleInput('${keyObj.day}', '${keyObj.time}', ${index})" onblur="onScheduleBlur('${keyObj.day}', '${keyObj.time}', ${index})" autocomplete="off">
+            <div class="suggest-box" id="suggest-box-${index}"></div>
           </div>
         </td>
         <td style="text-align: right; font-weight: bold; cursor: pointer; color: ${basePrice > 0 && !data.excludePrice ? '#2e7d32' : '#888'};" onclick="toggleSchedulePrice('${keyObj.day}', '${keyObj.time}')" title="タッチして金額の含める/除外を切り替え">
@@ -898,7 +911,7 @@ function toggleSchedulePrice(day, time) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].excludePrice = !currentSchedules[keyStr].excludePrice;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  saveSchedulesToStorage();
   renderSchedule();
 }
 
@@ -932,7 +945,7 @@ function onScheduleInput(day, time, index) {
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   
   currentSchedules[keyStr].name = val;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  saveSchedulesToStorage(); // 変更のたびに即時ストレージへ書き込み
 
   if (isEatOutItem(val)) {
     inputEl.classList.add('is-eatout');
@@ -985,13 +998,39 @@ function onScheduleInput(day, time, index) {
       });
 
   if (matches.length > 0) {
+    // ★ mousedown や touchstart を使って、サジェストをタップした瞬間に確実に値が確定・保存されるように変更
     suggestBox.innerHTML = matches.map(name => `
-      <div class="suggest-item" onclick="selectSuggest('${day}', '${time}', ${index}, '${name.replace(/'/g, "\\'")}')">${name}</div>
+      <div class="suggest-item" data-day="${day}" data-time="${time}" data-index="${index}" data-name="${name.replace(/"/g, '&quot;')}">${name}</div>
     `).join('');
+    
+    // サジェスト項目のクリック/タップイベントを設定
+    suggestBox.querySelectorAll('.suggest-item').forEach(item => {
+      const handleSelect = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const d = item.getAttribute('data-day');
+        const t = item.getAttribute('data-time');
+        const idx = item.getAttribute('data-index');
+        const mName = item.getAttribute('data-name');
+        selectSuggest(d, t, idx, mName);
+      };
+      item.addEventListener('mousedown', handleSelect);
+      item.addEventListener('touchstart', handleSelect, { passive: false });
+    });
+
     suggestBox.style.display = 'block';
   } else {
     suggestBox.style.display = 'none';
   }
+}
+
+function onScheduleBlur(day, time, index) {
+  const inputEl = document.getElementById(`sched-input-${index}`);
+  if (!inputEl) return;
+  const keyStr = `${day}_${time}`;
+  if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
+  currentSchedules[keyStr].name = inputEl.value;
+  saveSchedulesToStorage(); // フォーカスが外れた瞬間にも強制保存
 }
 
 function selectSuggest(day, time, index, menuName) {
@@ -1003,7 +1042,9 @@ function selectSuggest(day, time, index, menuName) {
   const keyStr = `${day}_${time}`;
   if (!currentSchedules[keyStr]) currentSchedules[keyStr] = { name: '', completed: false, excludePrice: false };
   currentSchedules[keyStr].name = menuName;
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  
+  // ★ 選択された瞬間に即座にストレージへ保存し、同期を確実に完了させる
+  saveSchedulesToStorage();
   renderSchedule();
 }
 
@@ -1052,7 +1093,7 @@ function toggleCompleteSchedule(day, time, index) {
     }
   }
 
-  localStorage.setItem('currentSchedules', JSON.stringify(currentSchedules));
+  saveSchedulesToStorage();
   renderSchedule();
   renderHistory();
 }
@@ -1093,7 +1134,7 @@ function renderHistory() {
     const idx = parseInt(item.getAttribute('data-index'));
     const startLongPress = () => {
       timer = setTimeout(() => {
-        if (confirm(`「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
+        if (confirm(`🎵「${historyRecords[idx].name}」の履歴を削除しますか？`)) {
           historyRecords.splice(idx, 1);
           localStorage.setItem('historyRecords', JSON.stringify(historyRecords));
           renderHistory();
